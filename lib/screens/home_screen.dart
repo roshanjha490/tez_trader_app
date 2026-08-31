@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/token_storage.dart';
+import '../services/sockets.dart';
 import '../widgets/stock_ribbon.dart';
 import 'main_shell.dart';
 
@@ -9,10 +10,6 @@ String _capitalize(String value) {
   return value[0].toUpperCase() + value.substring(1);
 }
 
-/// The "Overview" tab — this is where the ticker bar, watchlists, and
-/// portfolio summary from the dashboard design will eventually live.
-/// For now it carries over the welcome state from the old placeholder
-/// dashboard so the shell isn't empty.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -26,37 +23,61 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    
-    // Whenever this tab becomes visible (Index 0), re-fetch the API data!
+
     if (ActiveTab.of(context) == 0) {
       _userFuture = TokenStorage.getCurrentUser();
     }
   }
 
+  // Pull-to-refresh handler: re-reads the cached user (cheap, local) and
+  // force-reconnects the live ticker socket so StockRibbon gets a fresh
+  // initial_snapshot instead of just sitting on stale prices.
+  Future<void> _handleRefresh() async {
+    final refreshed = TokenStorage.getCurrentUser();
+    await Future.wait([
+      refreshed,
+      sectorsSocket.forceReconnect(),
+    ]);
+    if (mounted) {
+      setState(() {
+        _userFuture = refreshed;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 1. The Real-Time Ticker Ribbon at the very top
-        const StockRibbon(),
+    return FutureBuilder(
+      future: _userFuture,
+      builder: (context, snapshot) {
+        final user = snapshot.data;
 
-        // 2. The Scrollable Dashboard Content
-        Expanded(
-          child: FutureBuilder(
-            future: _userFuture,
-            builder: (context, snapshot) {
-              final user = snapshot.data;
-              
-              return SingleChildScrollView(
+        return RefreshIndicator(
+          onRefresh: _handleRefresh,
+          color: const Color(0xFF6C63FF),
+          backgroundColor: const Color(0xFF171727),
+          // No edgeOffset needed anymore — the ribbon is now the first
+          // sliver INSIDE this scroll view, so the indicator naturally
+          // appears above it, and the drag gesture starting anywhere
+          // (even directly over the ribbon) is captured by this same
+          // CustomScrollView instead of being lost to a sibling widget.
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              // 1. The Real-Time Ticker Ribbon — now part of the scroll,
+              // so pulling down while your finger is over it still drags
+              // the whole page and triggers refresh.
+              const SliverToBoxAdapter(child: StockRibbon()),
+
+              // 2. The Rest of the Dashboard Content
+              SliverPadding(
                 padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
                     Text(
                       user != null ? 'Welcome, ${_capitalize(user.firstName)}' : 'Welcome',
                       style: const TextStyle(
-                        color: Colors.white, 
+                        color: Colors.white,
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
@@ -65,28 +86,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     const Text(
                       'Here is your live market overview.',
                       style: TextStyle(
-                        color: Colors.white54, 
+                        color: Colors.white54,
                         fontSize: 14,
                       ),
                     ),
-                    
                     const SizedBox(height: 32),
-
-                    // --- Placeholders for Future Widgets ---
-                    // _buildPlaceholderCard('Portfolio Summary', Icons.pie_chart_outline),
-                    // const SizedBox(height: 16),
-                    // _buildPlaceholderCard('Active Watchlists', Icons.list_alt_rounded),
-                  ],
+                  ]),
                 ),
-              );
-            },
+              ),
+            ],
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 
-  // A helper method to draw glassmorphic placeholder cards
   Widget _buildPlaceholderCard(String title, IconData icon) {
     return Container(
       width: double.infinity,

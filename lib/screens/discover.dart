@@ -15,19 +15,13 @@ class DiscoverScreen extends StatelessWidget {
           elevation: 0,
           title: const Text(
             'Discover',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
           bottom: const TabBar(
             indicatorColor: Colors.white,
             labelColor: Colors.white,
             unselectedLabelColor: Colors.white54,
-            labelStyle: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
+            labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             unselectedLabelStyle: TextStyle(
               fontWeight: FontWeight.normal,
               fontSize: 14,
@@ -51,10 +45,7 @@ class DiscoverScreen extends StatelessWidget {
             ),
 
             // 3. Blogs (Coming Soon)
-            _ComingSoonPlaceholder(
-              icon: Icons.article_rounded,
-              title: "Blogs",
-            ),
+            _ComingSoonPlaceholder(icon: Icons.article_rounded, title: "Blogs"),
           ],
         ),
       ),
@@ -71,24 +62,40 @@ class _ComingSoonPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+    return RefreshIndicator(
+      onRefresh: () async {
+        // Nothing to fetch yet — this is just here so the pull gesture is
+        // consistent across every tab, and it's a one-line no-op to wire
+        // up real data once News/Blogs exist.
+        await Future.delayed(const Duration(milliseconds: 400));
+      },
+      color: Colors.blueAccent,
+      backgroundColor: const Color(0xFF111827),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          Icon(icon, size: 50, color: Colors.white24),
-          const SizedBox(height: 16),
-          Text(
-            '$title Coming Soon',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
+          const SizedBox(height: 160),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 50, color: Colors.white24),
+                const SizedBox(height: 16),
+                Text(
+                  '$title Coming Soon',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'We are working hard to bring this feature to you.',
+                  style: TextStyle(color: Colors.white38, fontSize: 14),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'We are working hard to bring this feature to you.',
-            style: TextStyle(color: Colors.white38, fontSize: 14),
           ),
         ],
       ),

@@ -4,7 +4,6 @@ import 'package:tez_trader_app/widgets/self_post_feed.dart';
 import '../services/token_storage.dart';
 import 'auth/login_screen.dart';
 
-
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -167,101 +166,111 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // --- TAB 1: PERSONAL INFO ---
   Widget _buildPersonalInfoTab(dynamic user) {
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        _buildInfoCard(
-          icon: Icons.person_outline,
-          title: 'Full Name',
-          value: _getFullName(user),
-        ),
-        const SizedBox(height: 16),
-        _buildInfoCard(
-          icon: Icons.email_outlined,
-          title: 'Email Address',
-          value: user?.email ?? 'Not set',
-        ),
-        const SizedBox(height: 16),
-        _buildInfoCard(
-          icon: Icons.phone_android,
-          title: 'Mobile Number',
-          value: user?.mobile ?? '+91 ******0000',
-          isLocked: true, // Cannot edit mobile
-        ),
-        const SizedBox(height: 32),
-        ElevatedButton.icon(
-          onPressed: () async {
-            // Navigate to the edit screen and wait for a result
-            final bool? wasUpdated = await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => EditProfileScreen(user: user)),
-            );
+    return RefreshIndicator(
+      onRefresh: () async => setState(() {}),
+      color: _accentColor,
+      backgroundColor: _cardColor,
+      child: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          _buildInfoCard(
+            icon: Icons.person_outline,
+            title: 'Full Name',
+            value: _getFullName(user),
+          ),
+          const SizedBox(height: 16),
+          _buildInfoCard(
+            icon: Icons.email_outlined,
+            title: 'Email Address',
+            value: user?.email ?? 'Not set',
+          ),
+          const SizedBox(height: 16),
+          _buildInfoCard(
+            icon: Icons.phone_android,
+            title: 'Mobile Number',
+            value: user?.mobile ?? '+91 ******0000',
+            isLocked: true, // Cannot edit mobile
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton.icon(
+            onPressed: () async {
+              // Navigate to the edit screen and wait for a result
+              final bool? wasUpdated = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => EditProfileScreen(user: user),
+                ),
+              );
 
-            // If the modal returned 'true' (OTP verified), force the profile to re-fetch!
-            if (wasUpdated == true) {
-              setState(
-                () {},
-              ); // Assuming ProfileScreen is a StatefulWidget, this triggers FutureBuilder to run again
-            }
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: _accentColor,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              // If the modal returned 'true' (OTP verified), force the profile to re-fetch!
+              if (wasUpdated == true) {
+                setState(
+                  () {},
+                ); // Assuming ProfileScreen is a StatefulWidget, this triggers FutureBuilder to run again
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _accentColor,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            icon: const Icon(Icons.edit, color: Colors.white),
+            label: const Text(
+              'Edit Profile',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
-          icon: const Icon(Icons.edit, color: Colors.white),
-          label: const Text(
-            'Edit Profile',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   // --- TAB 2: MY FEED ---
   Widget _buildMyFeedTab(dynamic user) {
-    return SelfPostFeed(
-      currentUserId: user?.id,
-    );
+    return SelfPostFeed(currentUserId: user?.id);
   }
 
   // --- TAB 3: SECURITY ---
   Widget _buildSecurityTab(dynamic user) {
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        _buildInfoCard(
-          icon: Icons.shield_outlined,
-          title: 'Two-Factor Authentication',
-          value: 'Enabled via Authenticator App',
-          valueColor: Colors.greenAccent,
-        ),
-        const SizedBox(height: 16),
-        _buildInfoCard(
-          icon: Icons.fingerprint,
-          title: 'Biometric Unlock',
-          value: 'Tap to configure FaceID/TouchID',
-        ),
-        const SizedBox(height: 16),
-        _buildInfoCard(
-          icon: Icons.history,
-          title: 'Last Login',
-          value: 'Today at 10:45 AM (Delhi, IN)', // Will come from API
-        ),
-        const SizedBox(height: 16),
-        _buildInfoCard(
-          icon: Icons.devices,
-          title: 'Connected Devices',
-          value: 'iPhone 15 Pro (Active)\nMacBook Pro (Web)',
-        ),
-      ],
+    return RefreshIndicator(
+      onRefresh: () async => setState(() {}),
+      color: _accentColor,
+      backgroundColor: _cardColor,
+      child: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          _buildInfoCard(
+            icon: Icons.shield_outlined,
+            title: 'Two-Factor Authentication',
+            value: 'Enabled via Authenticator App',
+            valueColor: Colors.greenAccent,
+          ),
+          const SizedBox(height: 16),
+          _buildInfoCard(
+            icon: Icons.fingerprint,
+            title: 'Biometric Unlock',
+            value: 'Tap to configure FaceID/TouchID',
+          ),
+          const SizedBox(height: 16),
+          _buildInfoCard(
+            icon: Icons.history,
+            title: 'Last Login',
+            value: 'Today at 10:45 AM (Delhi, IN)', // Will come from API
+          ),
+          const SizedBox(height: 16),
+          _buildInfoCard(
+            icon: Icons.devices,
+            title: 'Connected Devices',
+            value: 'iPhone 15 Pro (Active)\nMacBook Pro (Web)',
+          ),
+        ],
+      ),
     );
   }
 

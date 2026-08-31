@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/sockets.dart';
 
-import '../main_shell.dart'; 
+import '../main_shell.dart';
 
 // ignore: constant_identifier_names
 const Map<String, List<String>> SECTORS = {
@@ -280,14 +280,14 @@ class _SectorsTabState extends State<SectorsTab> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    
+
     // Sectors Tab is inside Markets Screen, which is Tab Index 1
     final isNowActive = ActiveTab.of(context) == 1;
 
     if (isNowActive && !_isActive) {
       _isActive = true;
       sectorsSocket.acquire(); // Connect!
-      
+
       if (sectorsPrices.hasSnapshot) {
         _livePrices = sectorsPrices.current;
       }
@@ -301,7 +301,7 @@ class _SectorsTabState extends State<SectorsTab> {
   void dispose() {
     _pricesSub?.cancel();
     _statusSub?.cancel();
-    
+
     if (_isActive) {
       sectorsSocket.release();
     }
@@ -502,111 +502,116 @@ class _SectorsTabState extends State<SectorsTab> {
 
         // 3. The Grid/List of Stocks
         Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: activeStocks.length,
-            itemBuilder: (context, index) {
-              final symbol = activeStocks[index];
-              final data = _livePrices[symbol];
+          child: RefreshIndicator(
+            onRefresh: () => sectorsSocket.forceReconnect(),
+            color: Colors.blueAccent,
+            backgroundColor: const Color(0xFF111827),
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: activeStocks.length,
+              itemBuilder: (context, index) {
+                final symbol = activeStocks[index];
+                final data = _livePrices[symbol];
 
-              final double ltp = (data?['ltp'] as num?)?.toDouble() ?? 0.0;
-              final double pct =
-                  (data?['pct_change'] as num?)?.toDouble() ?? 0.0;
-              final double open =
-                  (data?['daily_open'] as num?)?.toDouble() ?? 0.0;
-              final double high =
-                  (data?['daily_high'] as num?)?.toDouble() ?? 0.0;
-              final double low =
-                  (data?['daily_low'] as num?)?.toDouble() ?? 0.0;
+                final double ltp = (data?['ltp'] as num?)?.toDouble() ?? 0.0;
+                final double pct =
+                    (data?['pct_change'] as num?)?.toDouble() ?? 0.0;
+                final double open =
+                    (data?['daily_open'] as num?)?.toDouble() ?? 0.0;
+                final double high =
+                    (data?['daily_high'] as num?)?.toDouble() ?? 0.0;
+                final double low =
+                    (data?['daily_low'] as num?)?.toDouble() ?? 0.0;
 
-              final isPos = pct >= 0;
+                final isPos = pct >= 0;
 
-              return Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.03),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white.withOpacity(0.05)),
-                ),
-                child: Column(
-                  children: [
-                    // Top Row: Symbol & LTP
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          symbol,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Row(
-                          children: [
-                            Text(
-                              '₹${ltp.toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                fontFamily: 'monospace',
-                              ),
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.03),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white.withOpacity(0.05)),
+                  ),
+                  child: Column(
+                    children: [
+                      // Top Row: Symbol & LTP
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            symbol,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
                             ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isPos
-                                    ? Colors.greenAccent.withOpacity(0.1)
-                                    : Colors.redAccent.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                '${isPos ? '+' : ''}${pct.toStringAsFixed(2)}%',
-                                style: TextStyle(
-                                  color: isPos
-                                      ? Colors.greenAccent
-                                      : Colors.redAccent,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
+                          ),
+                          Row(
+                            children: [
+                              Text(
+                                '₹${ltp.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: 'monospace',
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    // Bottom Row: Intraday OHL
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _buildMetric(
-                          "O",
-                          open.toStringAsFixed(1),
-                          Colors.white54,
-                        ),
-                        _buildMetric(
-                          "H",
-                          high.toStringAsFixed(1),
-                          Colors.greenAccent.withOpacity(0.7),
-                        ),
-                        _buildMetric(
-                          "L",
-                          low.toStringAsFixed(1),
-                          Colors.redAccent.withOpacity(0.7),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            },
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isPos
+                                      ? Colors.greenAccent.withOpacity(0.1)
+                                      : Colors.redAccent.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  '${isPos ? '+' : ''}${pct.toStringAsFixed(2)}%',
+                                  style: TextStyle(
+                                    color: isPos
+                                        ? Colors.greenAccent
+                                        : Colors.redAccent,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      // Bottom Row: Intraday OHL
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildMetric(
+                            "O",
+                            open.toStringAsFixed(1),
+                            Colors.white54,
+                          ),
+                          _buildMetric(
+                            "H",
+                            high.toStringAsFixed(1),
+                            Colors.greenAccent.withOpacity(0.7),
+                          ),
+                          _buildMetric(
+                            "L",
+                            low.toStringAsFixed(1),
+                            Colors.redAccent.withOpacity(0.7),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
         ),
       ],

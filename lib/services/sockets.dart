@@ -23,7 +23,7 @@ final marketsSocket = ResilientSocketService(
   ticketFetcher: _fetchTicket,
   subscribeMessage: const {
     'type': 'subscribe',
-    'channels': ['strategies', 'breakouts', 'movers'],
+    'channels': ['reversal_strategies', 'railway_strategies', 'rajdhani_strategies', 'breakouts', 'movers'],
   },
 );
 

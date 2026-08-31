@@ -100,6 +100,18 @@ class ResilientSocketService with WidgetsBindingObserver {
     }
   }
 
+
+  Future<void> forceReconnect() async {
+    if (!_wantsConnection) return;
+    _reconnectTimer?.cancel();
+    _isConnecting = false;
+    _reconnectAttempt = 0;
+    _connectGeneration++;
+    _disconnect();
+    _setConnected(false);
+    await _connect();
+  }
+
   Future<void> _connect() async {
     if (_isConnecting || !_wantsConnection || _channel != null) return;
     _isConnecting = true;
