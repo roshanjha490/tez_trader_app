@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/onboarding_data.dart';
+import '../services/api_client.dart';
 import '../services/token_storage.dart';
 import 'main_shell.dart';
 import 'auth/login_screen.dart';
@@ -24,10 +25,24 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   Future<void> _decide() async {
-    final hasSession = await TokenStorage.hasSession();
+    final refreshToken = await TokenStorage.getRefreshToken();
     if (!mounted) return;
 
-    if (!hasSession) {
+    if (refreshToken == null) {
+      // No session was ever stored (or it was already cleared) — straight
+      // to login, nothing to refresh.
+      _replaceWith(const LoginScreen());
+      return;
+    }
+final refreshed = await ApiClient.forceRefresh();
+    if (!mounted) return;
+
+    if (!refreshed) {
+      // The refresh token itself was rejected (expired/revoked) or the
+      // request failed outright. Only NOW is it safe to clear tokens —
+      // we know for certain the session is actually dead rather than
+      // guessing from a decode error.
+      await TokenStorage.clearTokens();
       _replaceWith(const LoginScreen());
       return;
     }
@@ -36,10 +51,10 @@ class _AuthGateState extends State<AuthGate> {
     if (!mounted) return;
 
     if (user == null) {
-      // Access token missing/corrupt but a refresh token exists — ApiClient's
-      // interceptor will attempt a refresh on the first authenticated call,
-      // but we don't have a fresh access token to decode yet, so send the
-      // user back to login rather than guessing.
+
+      // We just successfully refreshed, so this really shouldn't happen —
+      // but if the freshly-saved access token still fails to decode for
+      // some reason, don't silently proceed with a null user either.
       await TokenStorage.clearTokens();
       _replaceWith(const LoginScreen());
       return;

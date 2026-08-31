@@ -214,7 +214,7 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
     try {
       await AuthApiClient.dio.post(
         '/auth/sendOTP',
-        data: {'mobile': int.parse(widget.phoneNumber)},
+        data: {'mobile': widget.phoneNumber},
       );
       if (mounted) _startResendTimer();
     } catch (e) {
@@ -421,37 +421,20 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                   const SizedBox(height: 40),
 
                   // Verify button
+                  // Verify button — "Secure Login" pill style
                   SizedBox(
                     width: double.infinity,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: verifyEnabled
-                              ? const [Color(0xFF6366F1), Color(0xFF9333EA)]
-                              : [
-                                  const Color(0xFF6366F1).withOpacity(0.35),
-                                  const Color(0xFF9333EA).withOpacity(0.35),
-                                ],
-                        ),
-                        boxShadow: verifyEnabled
-                            ? [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF9333EA,
-                                  ).withOpacity(0.5),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ]
-                            : null,
+                        color: verifyEnabled
+                            ? Colors.white
+                            : Colors.white.withOpacity(0.6),
+                        borderRadius: BorderRadius.circular(30),
                       ),
                       child: Material(
                         color: Colors.transparent,
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(30),
                           onTap: verifyEnabled ? _handleVerify : null,
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 16),
@@ -462,18 +445,31 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                                       width: 20,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: Colors.white,
+                                        color: Colors.black87,
                                       ),
                                     )
-                                  : Text(
-                                      'Verify',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: verifyEnabled
-                                            ? Colors.white
-                                            : Colors.white60,
-                                      ),
+                                  : Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          'Secure Login',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                            color: verifyEnabled
+                                                ? Colors.black87
+                                                : Colors.black45,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Icon(
+                                          Icons.verified_user_rounded,
+                                          size: 18,
+                                          color: verifyEnabled
+                                              ? Colors.black87
+                                              : Colors.black45,
+                                        ),
+                                      ],
                                     ),
                             ),
                           ),

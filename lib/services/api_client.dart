@@ -27,7 +27,7 @@ class ApiClient {
 
               // If it's expired, or expiring in the next 10 seconds, refresh it now!
               if (timeUntilExpiration.inSeconds < 10) {
-                final refreshed = await _refreshToken();
+                final refreshed = await forceRefresh();
                 
                 if (refreshed) {
                   // Fetch the shiny new token we just saved
@@ -65,7 +65,7 @@ class ApiClient {
               return handler.resolve(response);
             }
 
-            final refreshed = await _refreshToken();
+            final refreshed = await forceRefresh();
 
 
             if (refreshed) {
@@ -84,7 +84,7 @@ class ApiClient {
     );
   }
 
-  static Future<bool> _refreshToken() async {
+  static Future<bool> forceRefresh() async {
     try {
       final refreshToken = await TokenStorage.getRefreshToken();
       if (refreshToken == null) return false;
