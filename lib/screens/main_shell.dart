@@ -4,6 +4,8 @@ import 'home_screen.dart';
 import 'markets_screen.dart';
 import 'discover.dart';
 import 'profile_screen.dart';
+import '../theme/app_colors.dart';
+import 'dart:ui';
 
 /// Top-level app shell shown after auth. Owns the bottom navigation and the
 /// shared top bar (centered wordmark + notifications), and swaps between the
@@ -25,7 +27,7 @@ class _MainShellState extends State<MainShell> {
     ProfileScreen(),
   ];
 
-  static const _backgroundColor = Color(0xFF0E0E1A);
+  static const _backgroundColor = AppColors.background;
   static const _accentColor = Color(0xFF6C63FF);
 
   void _onTabTapped(int index) {
@@ -37,17 +39,64 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _backgroundColor,
+      extendBodyBehindAppBar: true,
       appBar: _buildTopBar(),
-      body: SafeArea(
-        bottom: false,
-        // 1. Wrap the IndexedStack with our new ActiveTab provider!
-        child: ActiveTab(
-          index: _selectedIndex,
-          child: IndexedStack(
-            index: _selectedIndex,
-            children: _tabs,
+      body: Stack(
+        children: [
+          Container(color: AppColors.background),
+          IgnorePointer(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(-0.5, -0.7),
+                  radius: 0.9,
+                  colors: [
+                    AppColors.blueGlow.withOpacity(0.20),
+                    AppColors.blueGlow.withOpacity(0.0),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
+          IgnorePointer(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(0, 0.5),
+                  radius: 1.1,
+                  colors: [
+                    AppColors.purpleGlow.withOpacity(0.20),
+                    AppColors.purpleGlow.withOpacity(0.0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // Emerald glow — center-ish
+          IgnorePointer(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(-0.2, 0.0),
+                  radius: 0.7,
+                  colors: [
+                    AppColors.emeraldGlow.withOpacity(0.10),
+                    AppColors.emeraldGlow.withOpacity(0.0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            bottom: false,
+            // 1. Wrap the IndexedStack with our new ActiveTab provider!
+            child: ActiveTab(
+              index: _selectedIndex,
+              child: IndexedStack(index: _selectedIndex, children: _tabs),
+            ),
+            ),
+        ],
       ),
       bottomNavigationBar: _FloatingNavBar(
         selectedIndex: _selectedIndex,
@@ -59,10 +108,23 @@ class _MainShellState extends State<MainShell> {
 
   PreferredSizeWidget _buildTopBar() {
     return AppBar(
-      backgroundColor: _backgroundColor,
+      backgroundColor: Colors.transparent,
       elevation: 0,
       centerTitle: true,
       automaticallyImplyLeading: false,
+      flexibleSpace: ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.04),
+              border: Border(
+                bottom: BorderSide(color: Colors.white.withOpacity(0.08)),
+              ),
+            ),
+          ),
+        ),
+      ),
       title: const Text(
         'TEZ TRADER',
         style: TextStyle(
@@ -170,7 +232,10 @@ class _FloatingNavBar extends StatelessWidget {
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     curve: Curves.easeOut,
-                    margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: isSelected
                           ? accentColor.withOpacity(0.14)
@@ -191,8 +256,9 @@ class _FloatingNavBar extends StatelessWidget {
                           style: TextStyle(
                             color: isSelected ? accentColor : Colors.white54,
                             fontSize: 11,
-                            fontWeight:
-                                isSelected ? FontWeight.w600 : FontWeight.w400,
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.w400,
                           ),
                         ),
                       ],
@@ -209,16 +275,12 @@ class _FloatingNavBar extends StatelessWidget {
 }
 
 /// Inherited widget to broadcast the active tab index down the tree.
-/// This allows child screens inside the IndexedStack to know when they 
+/// This allows child screens inside the IndexedStack to know when they
 /// are visible so they can automatically connect/disconnect WebSockets or re-fetch APIs.
 class ActiveTab extends InheritedWidget {
   final int index;
-  
-  const ActiveTab({
-    super.key, 
-    required this.index, 
-    required super.child
-  });
+
+  const ActiveTab({super.key, required this.index, required super.child});
 
   static int of(BuildContext context) {
     return context.dependOnInheritedWidgetOfExactType<ActiveTab>()?.index ?? 0;

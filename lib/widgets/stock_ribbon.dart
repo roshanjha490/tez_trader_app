@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:tez_trader_app/screens/main_shell.dart';
@@ -16,7 +17,7 @@ class _StockRibbonState extends State<StockRibbon> {
   Map<String, dynamic> _livePrices = {};
   bool _isDataLoaded = false;
 
-   bool _isActive = false; 
+  bool _isActive = false;
 
   // Controls the infinite marquee scrolling
   final ScrollController _scrollController = ScrollController();
@@ -46,14 +47,14 @@ class _StockRibbonState extends State<StockRibbon> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    
+
     // Check if we are currently on the Home Tab (Index 0)
     final isNowActive = ActiveTab.of(context) == 0;
 
     if (isNowActive && !_isActive) {
       _isActive = true;
       sectorsSocket.acquire(); // Connect!
-      
+
       // If we already have cached data, immediately show it and start scrolling
       if (sectorsPrices.hasSnapshot) {
         _livePrices = sectorsPrices.current;
@@ -63,7 +64,7 @@ class _StockRibbonState extends State<StockRibbon> {
     } else if (!isNowActive && _isActive) {
       _isActive = false;
       sectorsSocket.release(); // Disconnect!
-      
+
       // Stop the animation from consuming CPU while off-screen
       _scrollTimer?.cancel();
       _resumeTimer?.cancel();
@@ -78,7 +79,8 @@ class _StockRibbonState extends State<StockRibbon> {
     _scrollTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
-          _scrollController.offset + 2.4, // Adjust speed by changing this number
+          _scrollController.offset +
+              2.4, // Adjust speed by changing this number
           duration: const Duration(milliseconds: 30),
           curve: Curves.linear,
         );
@@ -92,24 +94,19 @@ class _StockRibbonState extends State<StockRibbon> {
     _resumeTimer?.cancel();
     _scrollController.dispose();
     _pricesSub?.cancel();
-    
+
     if (_isActive) {
       sectorsSocket.release();
     }
-    
+
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     if (!_isDataLoaded) {
-      // Skeleton loading state — same card footprint, dimmed placeholders.
-      return Container(
+      return SizedBox(
         height: _cardHeight,
-        decoration: const BoxDecoration(
-          color: Color(0xFF0B0F19),
-          border: Border(bottom: BorderSide(color: Colors.white12)),
-        ),
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           physics: const NeverScrollableScrollPhysics(),
@@ -131,23 +128,15 @@ class _StockRibbonState extends State<StockRibbon> {
 
     final symbols = _livePrices.keys.toList();
 
-    return Container(
+    return SizedBox(
       height: _cardHeight,
-      decoration: const BoxDecoration(
-        color: Color(0xFF0B0F19), // Matches your Next.js Dark Theme
-        border: Border(bottom: BorderSide(color: Colors.white12)),
-      ),
       child: NotificationListener<ScrollNotification>(
         onNotification: (notification) {
           if (notification is ScrollStartNotification &&
               notification.dragDetails != null) {
-            // User grabbed the ribbon — pause the auto-marquee immediately
-            // so it doesn't fight with their swipe.
             _scrollTimer?.cancel();
             _resumeTimer?.cancel();
           } else if (notification is ScrollEndNotification) {
-            // Whether they swiped, flung, or just tapped to stop it, resume
-            // the auto-marquee a few seconds after the ribbon settles.
             _resumeTimer?.cancel();
             _resumeTimer = Timer(const Duration(seconds: 3), _startMarquee);
           }
@@ -156,7 +145,6 @@ class _StockRibbonState extends State<StockRibbon> {
         child: ListView.builder(
           controller: _scrollController,
           scrollDirection: Axis.horizontal,
-          // Using an infinite builder replicates the continuous marquee
           itemBuilder: (context, index) {
             final symbol = symbols[index % symbols.length];
             final data = _livePrices[symbol] as Map<String, dynamic>? ?? {};
@@ -198,7 +186,9 @@ class _LiveStockCard extends StatelessWidget {
       // slightly and can push the layout past its fixed bounds even though
       // it fits perfectly at default scale. This keeps the ribbon immune to
       // that setting without affecting text size anywhere else in the app.
-      data: MediaQuery.of(context).copyWith(textScaler: const TextScaler.linear(1.0)),
+      data: MediaQuery.of(
+        context,
+      ).copyWith(textScaler: const TextScaler.linear(1.0)),
       child: Container(
         width: 180,
         margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
@@ -229,7 +219,10 @@ class _LiveStockCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: changeColor.withOpacity(0.14),
                     borderRadius: BorderRadius.circular(6),
@@ -270,7 +263,12 @@ class _LiveStockCard extends StatelessWidget {
             // Open / High row
             Row(
               children: [
-                Expanded(child: _MiniStat(label: 'O', value: dayOpen.toStringAsFixed(1))),
+                Expanded(
+                  child: _MiniStat(
+                    label: 'O',
+                    value: dayOpen.toStringAsFixed(1),
+                  ),
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: _MiniStat(
@@ -292,7 +290,12 @@ class _LiveStockCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 6),
-                Expanded(child: _MiniStat(label: 'C', value: prevClose.toStringAsFixed(1))),
+                Expanded(
+                  child: _MiniStat(
+                    label: 'C',
+                    value: prevClose.toStringAsFixed(1),
+                  ),
+                ),
               ],
             ),
           ],
