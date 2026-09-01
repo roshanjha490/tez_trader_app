@@ -6,6 +6,7 @@ import '../services/sockets.dart';
 import 'tabs/sectors_tab.dart';
 import 'tabs/shoutbox_tab.dart';
 import 'main_shell.dart';
+import 'dart:ui';
 
 class MarketsScreen extends StatefulWidget {
   const MarketsScreen({super.key});
@@ -46,7 +47,8 @@ class _MarketsScreenState extends State<MarketsScreen> {
       if (!mounted) return;
       setState(() {
         // -- Reversal Strategy --
-        if (type == 'initial_reversal_strategies' || type == 'reversal_price_update') {
+        if (type == 'initial_reversal_strategies' ||
+            type == 'reversal_price_update') {
           _reversalStrategies = List<dynamic>.from(data);
         } else if (type == 'reversal_strategies_update') {
           final updated = List<dynamic>.from(_reversalStrategies)
@@ -55,7 +57,8 @@ class _MarketsScreenState extends State<MarketsScreen> {
           _reversalStrategies = updated;
         }
         // -- Railway Strategy --
-        else if (type == 'initial_railway_strategies' || type == 'railway_price_update') {
+        else if (type == 'initial_railway_strategies' ||
+            type == 'railway_price_update') {
           _railwayStrategies = List<dynamic>.from(data);
         } else if (type == 'railway_strategies_update') {
           final updated = List<dynamic>.from(_railwayStrategies)
@@ -64,7 +67,8 @@ class _MarketsScreenState extends State<MarketsScreen> {
           _railwayStrategies = updated;
         }
         // -- Rajdhani Strategy --
-        else if (type == 'initial_rajdhani_strategies' || type == 'rajdhani_price_update') {
+        else if (type == 'initial_rajdhani_strategies' ||
+            type == 'rajdhani_price_update') {
           _rajdhaniStrategies = List<dynamic>.from(data);
         } else if (type == 'rajdhani_strategies_update') {
           final updated = List<dynamic>.from(_rajdhaniStrategies)
@@ -117,12 +121,13 @@ class _MarketsScreenState extends State<MarketsScreen> {
 
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 7,
       child: Scaffold(
-        backgroundColor: const Color(0xFF0B0F19),
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -130,7 +135,10 @@ class _MarketsScreenState extends State<MarketsScreen> {
             children: [
               const Text(
                 'Markets',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(width: 8),
               Icon(
@@ -146,8 +154,14 @@ class _MarketsScreenState extends State<MarketsScreen> {
             labelColor: Colors.white,
             unselectedLabelColor: Colors.white54,
             tabAlignment: TabAlignment.start,
-            labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-            unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 14),
+            labelStyle: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontWeight: FontWeight.normal,
+              fontSize: 14,
+            ),
             tabs: const [
               Tab(text: "Railway"),
               Tab(text: "Rajdhani"),
@@ -230,7 +244,8 @@ class _MarketsScreenState extends State<MarketsScreen> {
 
                 Color pnlColor = Colors.white54;
                 if (pnl.contains('+')) pnlColor = Colors.greenAccent;
-                if (pnl.contains('-') && pnl.length > 1) pnlColor = Colors.redAccent;
+                if (pnl.contains('-') && pnl.length > 1)
+                  pnlColor = Colors.redAccent;
 
                 Color statusBgColor = Colors.orangeAccent.withOpacity(0.1);
                 Color statusTextColor = Colors.orangeAccent;
@@ -274,14 +289,20 @@ class _MarketsScreenState extends State<MarketsScreen> {
                                 const SizedBox(width: 8),
                                 Text(
                                   time,
-                                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                                  style: const TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: 12,
+                                  ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 6),
                             Text(
                               strategyName,
-                              style: const TextStyle(color: Colors.white70, fontSize: 13),
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 13,
+                              ),
                             ),
                             const SizedBox(height: 6),
                             Text(
@@ -319,7 +340,10 @@ class _MarketsScreenState extends State<MarketsScreen> {
                           ),
                           const SizedBox(height: 10),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: statusBgColor,
                               border: Border.all(color: statusBorderColor),
@@ -385,13 +409,20 @@ class _MarketsScreenState extends State<MarketsScreen> {
                           ),
                           Text(
                             "(${_sentiment!['advances_pct']}%)",
-                            style: TextStyle(color: Colors.greenAccent.withOpacity(0.7), fontSize: 11),
+                            style: TextStyle(
+                              color: Colors.greenAccent.withOpacity(0.7),
+                              fontSize: 11,
+                            ),
                           ),
                         ],
                       ),
                       Text(
                         "Unchanged: ${_sentiment!['unchanged']}",
-                        style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.w500, fontSize: 11),
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 11,
+                        ),
                       ),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
@@ -406,7 +437,10 @@ class _MarketsScreenState extends State<MarketsScreen> {
                           ),
                           Text(
                             "(${_sentiment!['declines_pct']}%)",
-                            style: TextStyle(color: Colors.redAccent.withOpacity(0.7), fontSize: 11),
+                            style: TextStyle(
+                              color: Colors.redAccent.withOpacity(0.7),
+                              fontSize: 11,
+                            ),
                           ),
                         ],
                       ),
@@ -415,8 +449,10 @@ class _MarketsScreenState extends State<MarketsScreen> {
                   const SizedBox(height: 12),
                   Builder(
                     builder: (context) {
-                      final int advancesPct = (_sentiment!['advances_pct'] ?? 0).toInt();
-                      final int declinesPct = (_sentiment!['declines_pct'] ?? 0).toInt();
+                      final int advancesPct = (_sentiment!['advances_pct'] ?? 0)
+                          .toInt();
+                      final int declinesPct = (_sentiment!['declines_pct'] ?? 0)
+                          .toInt();
                       int unchangedPct = 100 - advancesPct - declinesPct;
                       if (unchangedPct < 0) unchangedPct = 0;
 
@@ -430,11 +466,20 @@ class _MarketsScreenState extends State<MarketsScreen> {
                         child: Row(
                           children: [
                             if (advancesPct > 0)
-                              Expanded(flex: advancesPct, child: Container(color: Colors.greenAccent)),
+                              Expanded(
+                                flex: advancesPct,
+                                child: Container(color: Colors.greenAccent),
+                              ),
                             if (unchangedPct > 0)
-                              Expanded(flex: unchangedPct, child: Container(color: Colors.grey[600])),
+                              Expanded(
+                                flex: unchangedPct,
+                                child: Container(color: Colors.grey[600]),
+                              ),
                             if (declinesPct > 0)
-                              Expanded(flex: declinesPct, child: Container(color: Colors.redAccent)),
+                              Expanded(
+                                flex: declinesPct,
+                                child: Container(color: Colors.redAccent),
+                              ),
                           ],
                         ),
                       );
@@ -453,50 +498,117 @@ class _MarketsScreenState extends State<MarketsScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  const Divider(color: Colors.white12),
-                  const SizedBox(height: 16),
                 ],
-                const Text(
-                  "TOP GAINERS",
-                  style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                ...(_movers!['gainers'] as List<dynamic>? ?? []).map(
-                  (g) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      g['symbol'] ?? '',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+
+                // Gainers / Losers side-by-side glass panels
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildMoversColumn(
+                      title: "TOP GAINERS",
+                      dotColor: Colors.greenAccent,
+                      items: _movers!['gainers'] as List<dynamic>? ?? [],
+                      isGain: true,
                     ),
-                    trailing: Text(
-                      '+${g['pct_change']}%',
-                      style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 15),
+                    const SizedBox(height: 12),
+                    _buildMoversColumn(
+                      title: "TOP LOSERS",
+                      dotColor: Colors.redAccent,
+                      items: _movers!['losers'] as List<dynamic>? ?? [],
+                      isGain: false,
                     ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Divider(color: Colors.white12),
-                const SizedBox(height: 16),
-                const Text(
-                  "TOP LOSERS",
-                  style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                ...(_movers!['losers'] as List<dynamic>? ?? []).map(
-                  (l) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      l['symbol'] ?? '',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                    trailing: Text(
-                      '${l['pct_change']}%',
-                      style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 15),
-                    ),
-                  ),
+                  ],
                 ),
               ],
             ),
+    );
+  }
+
+  Widget _buildMoversColumn({
+    required String title,
+    required Color dotColor,
+    required List<dynamic> items,
+    required bool isGain,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: dotColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                title,
+                style: TextStyle(
+                  color: dotColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...items.map((item) {
+            final pct = item['pct_change']?.toString() ?? '0.00';
+            final price = item['price'] ?? item['ltp'] ?? '0.00';
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item['symbol'] ?? '',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '₹$price',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        '${isGain ? '+' : ''}$pct%',
+                        style: TextStyle(
+                          color: isGain ? Colors.greenAccent : Colors.redAccent,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
     );
   }
 
@@ -510,29 +622,134 @@ class _MarketsScreenState extends State<MarketsScreen> {
               physics: const AlwaysScrollableScrollPhysics(),
               children: const [
                 SizedBox(height: 200),
-                Center(child: Text("No breakouts yet", style: TextStyle(color: Colors.white54))),
+                Center(
+                  child: Text(
+                    "No breakouts yet",
+                    style: TextStyle(color: Colors.white54),
+                  ),
+                ),
               ],
             )
           : ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(12),
               itemCount: _breakouts.length,
               itemBuilder: (context, index) {
                 final tick = _breakouts[index];
                 final isHigh = tick['type'] == 'DAILY_HIGH';
+                final breakColor = isHigh
+                    ? Colors.greenAccent
+                    : Colors.redAccent;
 
-                return ListTile(
-                  leading: Icon(
-                    isHigh ? Icons.trending_up : Icons.trending_down,
-                    color: isHigh ? Colors.green : Colors.red,
+                final pctChange =
+                    (tick['pct_change'] as num?)?.toDouble() ?? 0.0;
+                final isPos = pctChange >= 0;
+                final pctColor = isPos ? Colors.greenAccent : Colors.redAccent;
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
                   ),
-                  title: Text(tick['symbol'] ?? '', style: const TextStyle(color: Colors.white)),
-                  subtitle: Text(
-                    "Triggered at ${tick['time']}",
-                    style: const TextStyle(color: Colors.white54, fontSize: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withOpacity(0.08)),
                   ),
-                  trailing: Text(
-                    '₹${tick['price']}',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Left: symbol, badge, timestamp
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  tick['symbol'] ?? '',
+                                  style: TextStyle(
+                                    color: breakColor,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: breakColor.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: breakColor.withOpacity(0.3),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        isHigh
+                                            ? Icons.trending_up
+                                            : Icons.trending_down,
+                                        size: 12,
+                                        color: breakColor,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        isHigh ? 'HIGH BREAK' : 'LOW BREAK',
+                                        style: TextStyle(
+                                          color: breakColor,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.3,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              "Triggered at ${tick['time']}",
+                              style: const TextStyle(
+                                color: Colors.white54,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Right: price + % change
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '₹${tick['price']}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${isPos ? '+' : ''}${pctChange.toStringAsFixed(2)}%',
+                            style: TextStyle(
+                              color: pctColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 );
               },

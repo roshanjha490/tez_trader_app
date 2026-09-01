@@ -221,7 +221,7 @@ class _ShoutboxTabState extends State<ShoutboxTab> {
           child: RefreshIndicator(
             onRefresh: _fetchMessages,
             color: Colors.blueAccent,
-            backgroundColor: const Color(0xFF0B0F19),
+            backgroundColor: Colors.white.withOpacity(0.05),
             child: _messages.isEmpty && !_isLoadingOlder
                 ? const Center(
                     child: Text(
@@ -324,7 +324,7 @@ class _ShoutboxTabState extends State<ShoutboxTab> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFF0B0F19),
+            color: Colors.white.withOpacity(0.05),
             border: Border(
               top: BorderSide(color: Colors.white.withOpacity(0.1)),
             ),

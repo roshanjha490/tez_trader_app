@@ -9,7 +9,7 @@ class DiscoverScreen extends StatelessWidget {
     return DefaultTabController(
       length: 3,
       child: Scaffold(
-        backgroundColor: const Color(0xFF0B0F19), // Match your Dark Theme
+        backgroundColor: Colors.transparent, // Match your Dark Theme
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -70,7 +70,7 @@ class _ComingSoonPlaceholder extends StatelessWidget {
         await Future.delayed(const Duration(milliseconds: 400));
       },
       color: Colors.blueAccent,
-      backgroundColor: const Color(0xFF111827),
+      backgroundColor: Colors.transparent,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
