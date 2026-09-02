@@ -5,13 +5,27 @@ import 'markets_screen.dart';
 import 'discover.dart';
 import 'profile_screen.dart';
 import '../theme/app_colors.dart';
+import '../services/app_navigation.dart';
 import 'dart:ui';
+
+/// Stable key so code elsewhere (e.g. requestSectorTab) can reach the one
+/// live MainShell instance without needing a BuildContext that's actually
+/// inside MainShell's own tree.
+final GlobalKey<_MainShellState> _mainShellKey = GlobalKey<_MainShellState>();
+
+/// Switches MainShell's bottom-nav tab from anywhere in the app.
+void switchMainShellTab(int index) {
+  _mainShellKey.currentState?.selectTab(index);
+}
 
 /// Top-level app shell shown after auth. Owns the bottom navigation and the
 /// shared top bar (centered wordmark + notifications), and swaps between the
 /// four primary tabs without losing each tab's state.
 class MainShell extends StatefulWidget {
-  const MainShell({super.key});
+  // Not `const` anymore: the default key comes from a global variable
+  // (_mainShellKey), which isn't a compile-time constant. Every existing
+  // `const MainShell()` call site needs to drop the `const`.
+  MainShell({Key? key}) : super(key: key ?? _mainShellKey);
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -30,10 +44,35 @@ class _MainShellState extends State<MainShell> {
   static const _backgroundColor = AppColors.background;
   static const _accentColor = Color(0xFF6C63FF);
 
-  void _onTabTapped(int index) {
+  // Markets is tab index 1 in `_tabs` above.
+  static const int _marketsTabIndex = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    sectorTabRequest.addListener(_handleSectorTabRequest);
+  }
+
+  @override
+  void dispose() {
+    sectorTabRequest.removeListener(_handleSectorTabRequest);
+    super.dispose();
+  }
+
+  void _handleSectorTabRequest() {
+    if (sectorTabRequest.value != null) {
+      selectTab(_marketsTabIndex);
+    }
+  }
+
+  /// Public so it can be triggered both by bottom-nav taps and by
+  /// switchMainShellTab() from outside this widget's own tree.
+  void selectTab(int index) {
     if (index == _selectedIndex) return;
     setState(() => _selectedIndex = index);
   }
+
+  void _onTabTapped(int index) => selectTab(index);
 
   @override
   Widget build(BuildContext context) {

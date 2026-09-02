@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../services/sockets.dart';
+import '../services/app_navigation.dart';
 import 'tabs/sectors_tab.dart';
 import 'tabs/shoutbox_tab.dart';
 import 'main_shell.dart';
@@ -18,12 +19,25 @@ class MarketsScreen extends StatefulWidget {
   State<MarketsScreen> createState() => _MarketsScreenState();
 }
 
-class _MarketsScreenState extends State<MarketsScreen> {
+// Index of the "Sectors" sub-tab within this screen's TabBar/TabBarView.
+const int _sectorsSubTabIndex = 6;
+
+class _MarketsScreenState extends State<MarketsScreen>
+    with SingleTickerProviderStateMixin {
   StreamSubscription? _dataSub;
   StreamSubscription<bool>? _statusSub;
   bool _isConnected = false;
 
   bool _isActive = false;
+
+  // Explicit TabController (replaces DefaultTabController) so the Sectors
+  // sub-tab can be selected programmatically at any time — e.g. when the
+  // Home tab's Sector Performance card requests a specific sector — not
+  // just once at construction. MarketsScreen is created ONCE and kept
+  // alive inside MainShell's IndexedStack, so `initState`/`initialIndex`
+  // only ever runs a single time; a later request needs a live controller
+  // to `animateTo()`, it can't rely on rebuilding with a new initialIndex.
+  late final TabController _tabController;
 
   // React State equivalents — one list per strategy type now.
   List<dynamic> _reversalStrategies = [];
@@ -36,6 +50,14 @@ class _MarketsScreenState extends State<MarketsScreen> {
   @override
   void initState() {
     super.initState();
+
+    _tabController = TabController(
+      length: 7,
+      vsync: this,
+      initialIndex: widget.initialTabIndex,
+    );
+
+    sectorTabRequest.addListener(_handleSectorTabRequest);
 
     _statusSub = marketsSocket.statusStream.listen((connected) {
       if (mounted) setState(() => _isConnected = connected);
@@ -96,6 +118,12 @@ class _MarketsScreenState extends State<MarketsScreen> {
     });
   }
 
+  void _handleSectorTabRequest() {
+    if (sectorTabRequest.value != null) {
+      _tabController.animateTo(_sectorsSubTabIndex);
+    }
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -114,6 +142,8 @@ class _MarketsScreenState extends State<MarketsScreen> {
 
   @override
   void dispose() {
+    sectorTabRequest.removeListener(_handleSectorTabRequest);
+    _tabController.dispose();
     _dataSub?.cancel();
     _statusSub?.cancel();
 
@@ -127,67 +157,65 @@ class _MarketsScreenState extends State<MarketsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 7,
-      initialIndex: widget.initialTabIndex,
-      child: Scaffold(
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          title: Row(
-            children: [
-              const Text(
-                'Markets',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.circle,
-                size: 10,
-                color: _isConnected ? Colors.greenAccent : Colors.redAccent,
-              ),
-            ],
-          ),
-          bottom: TabBar(
-            isScrollable: true,
-            indicatorColor: Colors.white,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white54,
-            tabAlignment: TabAlignment.start,
-            labelStyle: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
-            unselectedLabelStyle: const TextStyle(
-              fontWeight: FontWeight.normal,
-              fontSize: 14,
-            ),
-            tabs: const [
-              Tab(text: "Rajdhani"),
-              Tab(text: "Railway"),
-              Tab(text: "Reversal"),
-              Tab(text: "Top Movers"),
-              Tab(text: "Live Breakout"),
-              Tab(text: "Shoutbox"),
-              Tab(text: "Sectors"),
-            ],
-          ),
-        ),
-        body: TabBarView(
+        elevation: 0,
+        title: Row(
           children: [
-            _buildStrategiesTab(_rajdhaniStrategies),
-            _buildStrategiesTab(_railwayStrategies),
-            _buildStrategiesTab(_reversalStrategies),
-            _buildMoversTab(),
-            _buildBreakoutsTab(),
-            const ShoutboxTab(),
-            SectorsTab(initialSector: widget.initialSector),
+            const Text(
+              'Markets',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.circle,
+              size: 10,
+              color: _isConnected ? Colors.greenAccent : Colors.redAccent,
+            ),
           ],
         ),
+        bottom: TabBar(
+          controller: _tabController,
+          isScrollable: true,
+          indicatorColor: Colors.white,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white54,
+          tabAlignment: TabAlignment.start,
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.normal,
+            fontSize: 14,
+          ),
+          tabs: const [
+            Tab(text: "Rajdhani"),
+            Tab(text: "Railway"),
+            Tab(text: "Reversal"),
+            Tab(text: "Top Movers"),
+            Tab(text: "Live Breakout"),
+            Tab(text: "Shoutbox"),
+            Tab(text: "Sectors"),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildStrategiesTab(_rajdhaniStrategies),
+          _buildStrategiesTab(_railwayStrategies),
+          _buildStrategiesTab(_reversalStrategies),
+          _buildMoversTab(),
+          _buildBreakoutsTab(),
+          const ShoutboxTab(),
+          SectorsTab(initialSector: widget.initialSector),
+        ],
       ),
     );
   }

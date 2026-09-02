@@ -61,7 +61,10 @@ final refreshed = await ApiClient.forceRefresh();
     }
 
     if (user.profileCompleted) {
-      _replaceWith(const MainShell());
+      // MainShell no longer has a const constructor — its default key
+      // comes from a global GlobalKey variable (see main_shell.dart),
+      // which isn't a compile-time constant.
+      _replaceWith(MainShell());
     } else {
       _replaceWith(
         PersonalDetailsScreen(

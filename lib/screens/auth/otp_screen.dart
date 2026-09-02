@@ -170,7 +170,7 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
         if (!mounted) return;
         if (profileCompleted) {
           Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const MainShell()),
+            MaterialPageRoute(builder: (_) => MainShell()),
             (route) => false,
           );
         } else {

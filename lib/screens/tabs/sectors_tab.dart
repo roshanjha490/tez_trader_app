@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/sockets.dart';
+import '../../services/app_navigation.dart';
 
 import '../main_shell.dart';
 
@@ -263,11 +264,24 @@ class _SectorsTabState extends State<SectorsTab> {
   void initState() {
     super.initState();
 
-    _activeSector =
-        (widget.initialSector != null &&
-            SECTORS.containsKey(widget.initialSector))
-        ? widget.initialSector!
-        : "Banking";
+    // SectorsTab is built lazily by TabBarView the FIRST time its sub-tab
+    // is actually shown — which, for a sector request coming from outside
+    // (see app_navigation.dart), may be happening right now, in response to
+    // that very request. So on top of `widget.initialSector` (fixed once,
+    // from whenever this widget instance was constructed), also check for
+    // a pending request directly — otherwise a request that arrives before
+    // this tab has ever been visited would be missed.
+    final pendingRequest = sectorTabRequest.value;
+    if (pendingRequest != null && SECTORS.containsKey(pendingRequest.sector)) {
+      _activeSector = pendingRequest.sector;
+    } else if (widget.initialSector != null &&
+        SECTORS.containsKey(widget.initialSector)) {
+      _activeSector = widget.initialSector!;
+    } else {
+      _activeSector = "Banking";
+    }
+
+    sectorTabRequest.addListener(_handleSectorTabRequest);
 
     _isConnected = sectorsSocket.isConnected;
     _statusSub = sectorsSocket.statusStream.listen((connected) {
@@ -282,6 +296,16 @@ class _SectorsTabState extends State<SectorsTab> {
       if (!mounted) return;
       setState(() => _livePrices = prices);
     });
+  }
+
+  void _handleSectorTabRequest() {
+    final req = sectorTabRequest.value;
+    if (req != null && SECTORS.containsKey(req.sector) && mounted) {
+      setState(() {
+        _activeSector = req.sector;
+        _searchQuery = "";
+      });
+    }
   }
 
   @override
@@ -306,6 +330,7 @@ class _SectorsTabState extends State<SectorsTab> {
 
   @override
   void dispose() {
+    sectorTabRequest.removeListener(_handleSectorTabRequest);
     _pricesSub?.cancel();
     _statusSub?.cancel();
 

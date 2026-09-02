@@ -74,7 +74,7 @@ class _ExperienceConfirmationScreenState extends State<ExperienceConfirmationScr
 
         if (!mounted) return;
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const MainShell()),
+          MaterialPageRoute(builder: (_) => MainShell()),
           (route) => false,
         );
       } else {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../screens/tabs/sectors_tab.dart' show SECTORS;
-import '../screens/markets_screen.dart';
+import '../services/app_navigation.dart';
 import 'dart:ui';
 
 class SectorPerformanceCard extends StatefulWidget {
@@ -123,14 +123,7 @@ class _SectorPerformanceCardState extends State<SectorPerformanceCard> {
                         color: Colors
                             .transparent, // Required to keep the InkWell ripple visible
                         child: InkWell(
-                          // onTap: () => Navigator.of(context).push(
-                          //   MaterialPageRoute(
-                          //     builder: (_) => MarketsScreen(
-                          //       initialTabIndex: 6,
-                          //       initialSector: entry.key,
-                          //     ),
-                          //   ),
-                          // ),
+                          onTap: () => requestSectorTab(entry.key),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 0,
