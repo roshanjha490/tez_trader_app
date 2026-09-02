@@ -92,32 +92,82 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
   // LOGIC
   // ==========================================
 
-  Future<void> _pickImages() async {
+  void _showImageSourceOptions() {
     if (totalImages >= maxFiles) return;
 
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E293B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Wrap(
+            children: <Widget>[
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: Colors.blueAccent),
+                title: const Text('Photo Gallery', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickFromGallery();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt, color: Colors.blueAccent),
+                title: const Text('Camera', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickFromCamera();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // 2. Handle Gallery (Multiple Images)
+  Future<void> _pickFromGallery() async {
     try {
       final List<XFile> images = await _picker.pickMultiImage();
       if (images.isEmpty) return;
-
-      int remainingSlots = maxFiles - totalImages;
-      List<XFile> validImages = [];
-
-      for (var file in images.take(remainingSlots)) {
-        final length = await file.length();
-        if (length > maxFileSizeBytes) {
-          setState(() => _error = "One or more images exceed 5MB.");
-          continue;
-        }
-        validImages.add(file);
-      }
-
-      setState(() {
-        _selectedImages.addAll(validImages);
-        _error = null;
-      });
+      await _processSelectedFiles(images);
     } catch (e) {
       setState(() => _error = "Failed to pick images");
     }
+  }
+
+  // 3. Handle Camera (Single Image)
+  Future<void> _pickFromCamera() async {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.camera);
+      if (image == null) return;
+      await _processSelectedFiles([image]);
+    } catch (e) {
+      setState(() => _error = "Failed to capture image");
+    }
+  }
+
+  // 4. Shared Validation Logic
+  Future<void> _processSelectedFiles(List<XFile> images) async {
+    int remainingSlots = maxFiles - totalImages;
+    List<XFile> validImages = [];
+
+    for (var file in images.take(remainingSlots)) {
+      final length = await file.length();
+      if (length > maxFileSizeBytes) {
+        setState(() => _error = "One or more images exceed 5MB.");
+        continue;
+      }
+      validImages.add(file);
+    }
+
+    setState(() {
+      _selectedImages.addAll(validImages);
+      _error = null;
+    });
   }
 
   Future<void> _submitPost() async {
@@ -324,7 +374,7 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
                       children: [
                         // Add Photo Text Button
                         GestureDetector(
-                          onTap: totalImages >= maxFiles ? null : _pickImages,
+                          onTap: totalImages >= maxFiles ? null : _showImageSourceOptions,
                           child: Row(
                             children: [
                               Icon(Icons.photo_outlined, size: 20, color: totalImages >= maxFiles ? Colors.white38 : Colors.blueAccent),
