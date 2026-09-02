@@ -1,12 +1,16 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../services/token_storage.dart';
 import '../services/sockets.dart';
 import '../widgets/stock_ribbon.dart';
+import '../widgets/index_cards.dart';
+import '../widgets/watchlist_widget.dart';
+import '../widgets/sector_performance_card.dart';
 import 'main_shell.dart';
 
 String _capitalize(String value) {
-  if (value == null || value.isEmpty) return value;
+  if (value.isEmpty) return value;
   return value[0].toUpperCase() + value.substring(1);
 }
 
@@ -20,18 +24,54 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   Future<dynamic>? _userFuture;
 
+  StreamSubscription<Map<String, dynamic>>? _pricesSub;
+  Map<String, dynamic> _livePrices = {};
+  bool _isDataLoaded = false;
+  bool _isActive = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pricesSub = sectorsPrices.stream.listen((prices) {
+      if (!mounted) return;
+      setState(() {
+        _livePrices = prices;
+        _isDataLoaded = true;
+      });
+    });
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    if (ActiveTab.of(context) == 0) {
+    final isNowActive = ActiveTab.of(context) == 0;
+
+    if (isNowActive && !_isActive) {
+      _isActive = true;
       _userFuture = TokenStorage.getCurrentUser();
+      sectorsSocket.acquire();
+
+      if (sectorsPrices.hasSnapshot) {
+        _livePrices = sectorsPrices.current;
+        _isDataLoaded = true;
+      }
+    } else if (!isNowActive && _isActive) {
+      _isActive = false;
+      sectorsSocket.release();
     }
   }
 
-  // Pull-to-refresh handler: re-reads the cached user (cheap, local) and
-  // force-reconnects the live ticker socket so StockRibbon gets a fresh
-  // initial_snapshot instead of just sitting on stale prices.
+  @override
+  void dispose() {
+    _pricesSub?.cancel();
+    if (_isActive) sectorsSocket.release();
+    super.dispose();
+  }
+
+  // Pull-to-refresh: re-reads the cached user and force-reconnects the
+  // live ticker socket so everything (ribbon, indices, watchlist, sectors)
+  // gets a fresh initial_snapshot instead of sitting on stale prices.
   Future<void> _handleRefresh() async {
     final refreshed = TokenStorage.getCurrentUser();
     await Future.wait([
@@ -47,6 +87,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final trackingPrices = Map<String, dynamic>.fromEntries(
+      _livePrices.entries.where((e) => isTrackingInstrument(e.key)),
+    );
+
     return FutureBuilder(
       future: _userFuture,
       builder: (context, snapshot) {
@@ -56,22 +100,16 @@ class _HomeScreenState extends State<HomeScreen> {
           onRefresh: _handleRefresh,
           color: const Color(0xFF6C63FF),
           backgroundColor: const Color(0xFF171727),
-          // No edgeOffset needed anymore — the ribbon is now the first
-          // sliver INSIDE this scroll view, so the indicator naturally
-          // appears above it, and the drag gesture starting anywhere
-          // (even directly over the ribbon) is captured by this same
-          // CustomScrollView instead of being lost to a sibling widget.
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              // 1. The Real-Time Ticker Ribbon — now part of the scroll,
-              // so pulling down while your finger is over it still drags
-              // the whole page and triggers refresh.
+              // 1. Live ticker ribbon (normal stocks only)
               const SliverToBoxAdapter(child: StockRibbon()),
 
-              // 2. The Rest of the Dashboard Content
+              // 2. Rest of the dashboard
               SliverPadding(
-                padding: const EdgeInsets.all(24),
+                // Decreased horizontal padding from 24 to 16
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
                     Text(
@@ -85,11 +123,20 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 8),
                     const Text(
                       'Here is your live market overview.',
-                      style: TextStyle(
-                        color: Colors.white54,
-                        fontSize: 14,
-                      ),
+                      style: TextStyle(color: Colors.white54, fontSize: 14),
                     ),
+                    const SizedBox(height: 24),
+
+                    // 3. Index cards (NIFTY 50, BANK NIFTY, SENSEX, etc.)
+                    IndexCardsRow(trackingPrices: trackingPrices, isDataLoaded: _isDataLoaded),
+                    const SizedBox(height: 24),
+
+                    // 4. Watchlist
+                    WatchlistWidget(livePrices: _livePrices),
+                    const SizedBox(height: 24),
+
+                    // 5. Sector performance (tap a row -> Markets > Sectors)
+                    SectorPerformanceCard(livePrices: _livePrices),
                     const SizedBox(height: 32),
                   ]),
                 ),
@@ -98,34 +145,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       },
-    );
-  }
-
-  Widget _buildPlaceholderCard(String title, IconData icon) {
-    return Container(
-      width: double.infinity,
-      height: 160,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.03),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white12),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 32, color: Colors.white24),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white38,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

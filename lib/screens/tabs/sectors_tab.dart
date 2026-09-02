@@ -240,7 +240,8 @@ const Map<String, List<String>> SECTORS = {
 };
 
 class SectorsTab extends StatefulWidget {
-  const SectorsTab({super.key});
+  final String? initialSector;
+  const SectorsTab({super.key, this.initialSector});
 
   @override
   State<SectorsTab> createState() => _SectorsTabState();
@@ -253,7 +254,7 @@ class _SectorsTabState extends State<SectorsTab> {
   bool _isConnected = false;
   Map<String, dynamic> _livePrices = {};
 
-  String _activeSector = "Banking";
+  late String _activeSector;
   String _searchQuery = "";
 
   bool _isActive = false;
@@ -261,6 +262,12 @@ class _SectorsTabState extends State<SectorsTab> {
   @override
   void initState() {
     super.initState();
+
+    _activeSector =
+        (widget.initialSector != null &&
+            SECTORS.containsKey(widget.initialSector))
+        ? widget.initialSector!
+        : "Banking";
 
     _isConnected = sectorsSocket.isConnected;
     _statusSub = sectorsSocket.statusStream.listen((connected) {

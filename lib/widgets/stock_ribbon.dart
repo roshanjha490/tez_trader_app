@@ -35,8 +35,11 @@ class _StockRibbonState extends State<StockRibbon> {
     _pricesSub = sectorsPrices.stream.listen((prices) {
       if (!mounted) return;
       final justLoaded = !_isDataLoaded;
+      final filtered = Map<String, dynamic>.fromEntries(
+        prices.entries.where((e) => !isTrackingInstrument(e.key)),
+      );
       setState(() {
-        _livePrices = prices;
+        _livePrices = filtered;
         _isDataLoaded = true;
       });
       // Only start the marquee if the user is currently on the Home tab
@@ -57,7 +60,9 @@ class _StockRibbonState extends State<StockRibbon> {
 
       // If we already have cached data, immediately show it and start scrolling
       if (sectorsPrices.hasSnapshot) {
-        _livePrices = sectorsPrices.current;
+        _livePrices = Map<String, dynamic>.fromEntries(
+          sectorsPrices.current.entries.where((e) => !isTrackingInstrument(e.key)),
+        );
         _isDataLoaded = true;
         _startMarquee();
       }

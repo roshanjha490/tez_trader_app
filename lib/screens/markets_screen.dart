@@ -9,7 +9,10 @@ import 'main_shell.dart';
 import 'dart:ui';
 
 class MarketsScreen extends StatefulWidget {
-  const MarketsScreen({super.key});
+  final int initialTabIndex;
+  final String? initialSector;
+
+  const MarketsScreen({super.key, this.initialTabIndex = 0, this.initialSector});
 
   @override
   State<MarketsScreen> createState() => _MarketsScreenState();
@@ -126,6 +129,7 @@ class _MarketsScreenState extends State<MarketsScreen> {
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 7,
+      initialIndex: widget.initialTabIndex,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
@@ -163,8 +167,8 @@ class _MarketsScreenState extends State<MarketsScreen> {
               fontSize: 14,
             ),
             tabs: const [
-              Tab(text: "Railway"),
               Tab(text: "Rajdhani"),
+              Tab(text: "Railway"),
               Tab(text: "Reversal"),
               Tab(text: "Top Movers"),
               Tab(text: "Live Breakout"),
@@ -175,13 +179,13 @@ class _MarketsScreenState extends State<MarketsScreen> {
         ),
         body: TabBarView(
           children: [
-            _buildStrategiesTab(_railwayStrategies),
             _buildStrategiesTab(_rajdhaniStrategies),
+            _buildStrategiesTab(_railwayStrategies),
             _buildStrategiesTab(_reversalStrategies),
             _buildMoversTab(),
             _buildBreakoutsTab(),
             const ShoutboxTab(),
-            const SectorsTab(),
+            SectorsTab(initialSector: widget.initialSector),
           ],
         ),
       ),

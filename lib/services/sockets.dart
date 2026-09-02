@@ -79,3 +79,13 @@ class LivePricesCache {
 }
 
 final sectorsPrices = LivePricesCache();
+
+const List<String> trackingInstruments = [
+  "NIFTY_50",
+  "NIFTY_BANK",
+  "SENSEX",
+  "NIFTY GIFT",
+  "INDIA_VIX",
+];
+
+bool isTrackingInstrument(String symbol) => trackingInstruments.contains(symbol);
