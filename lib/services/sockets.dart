@@ -2,13 +2,16 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'api_client.dart';
+import 'auth_api_client.dart';
 import 'resilient_socket_service.dart';
 
-Uri _buildUri(String path, String token) {
-  final decodedUrl =
-      utf8.decode(base64Decode('d3M6Ly8xNzguMTA0LjMuMjY6ODAwMA=='));
-  return Uri.parse('$decodedUrl$path?token=$token');
-}
+/// Market-data service (same host the web portal's SOCKET_BACKEND_URL
+/// points at). The old hard-coded IP (ws://178.104.3.26:8000) no longer
+/// answers, and plain ws:// is blocked by iOS anyway.
+const String _marketDataBaseUrl = 'wss://ws.teztrader.com';
+
+Uri _buildUri(String path, String token) =>
+    Uri.parse('$_marketDataBaseUrl$path?token=$token');
 
 Future<String?> _fetchTicket() async {
   final r = await ApiClient.dio.post('/user/ws-python-ticket');
@@ -23,7 +26,41 @@ final marketsSocket = ResilientSocketService(
   ticketFetcher: _fetchTicket,
   subscribeMessage: const {
     'type': 'subscribe',
-    'channels': ['reversal_strategies', 'railway_strategies', 'rajdhani_strategies', 'breakouts', 'movers'],
+    'channels': ['reversal_strategies', 'breakouts', 'movers'],
+  },
+);
+
+/// Sector rotation board (strong/weak sectors, rotation arrows, signals).
+final rotationSocket = ResilientSocketService(
+  wsUriBuilder: (token) => _buildUri('/sector-rotation', token),
+  ticketFetcher: _fetchTicket,
+);
+
+/// Live market news. It's served by a separate host from the price feeds
+/// and uses the public (no-login) ticket, like the portal's News page.
+const String _newsBaseUrl = 'wss://ws.wjxq.info';
+
+Future<String?> _fetchPublicTicket() async {
+  final r = await AuthApiClient.dio.get('/auth/tz-python-super-secret-generator-lmcql');
+  return r.data['token'] as String?;
+}
+
+final newsSocket = ResilientSocketService(
+  wsUriBuilder: (token) => Uri.parse('$_newsBaseUrl/ws/news?token=$token'),
+  ticketFetcher: _fetchPublicTicket,
+);
+
+/// Symbols the paper-trading screen wants live prices for. The feed only
+/// streams what it's told to via `update_symbols`, so this is re-sent on
+/// every reconnect and whenever the set of open positions changes.
+List<String> paperSymbols = [];
+
+final paperSocket = ResilientSocketService(
+  wsUriBuilder: (token) => _buildUri('/ltp-stocks-subscribed', token),
+  ticketFetcher: _fetchTicket,
+  subscribeMessageBuilder: () => {
+    'type': 'update_symbols',
+    'symbols': paperSymbols,
   },
 );
 
@@ -68,7 +105,11 @@ class LivePricesCache {
           ..clear()
           ..addAll(Map<String, dynamic>.from(decoded['data']));
         _hasSnapshot = true;
+      } else if (decoded['type'] == 'batch') {
+        // Many symbols at once, roughly every 250 ms: {SYMBOL: {...}, ...}
+        _prices.addAll(Map<String, dynamic>.from(decoded['data']));
       } else if (decoded['type'] == 'update') {
+        // Older per-symbol format; the server may still send it.
         _prices[decoded['symbol']] = decoded['data'];
       } else {
         return;

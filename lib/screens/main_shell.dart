@@ -1,3 +1,4 @@
+import '../widgets/notification_bell.dart';
 import 'package:flutter/material.dart';
 
 import 'home_screen.dart';
@@ -7,6 +8,8 @@ import 'profile_screen.dart';
 import '../theme/app_colors.dart';
 import '../services/app_navigation.dart';
 import 'dart:ui';
+import 'package:flutter/services.dart';
+import '../services/alerts_service.dart';
 
 /// Stable key so code elsewhere (e.g. requestSectorTab) can reach the one
 /// live MainShell instance without needing a BuildContext that's actually
@@ -51,12 +54,51 @@ class _MainShellState extends State<MainShell> {
   void initState() {
     super.initState();
     sectorTabRequest.addListener(_handleSectorTabRequest);
+    urgentAlert.addListener(_handleUrgentAlert);
+    AlertsService.instance.start();
   }
 
   @override
   void dispose() {
     sectorTabRequest.removeListener(_handleSectorTabRequest);
+    urgentAlert.removeListener(_handleUrgentAlert);
+    AlertsService.instance.stop();
     super.dispose();
+  }
+
+  /// Admin-pushed URGENT_BROADCAST: loud, impossible-to-miss modal.
+  void _handleUrgentAlert() {
+    final alert = urgentAlert.value;
+    if (alert == null || !mounted) return;
+
+    SystemSound.play(SystemSoundType.alert);
+    HapticFeedback.heavyImpact();
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF2A0F14),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Colors.redAccent, width: 1.5),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
+            SizedBox(width: 8),
+            Text('URGENT ALERT', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(alert.message, style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.4)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Acknowledge & Dismiss'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _handleSectorTabRequest() {
@@ -174,13 +216,7 @@ class _MainShellState extends State<MainShell> {
         ),
       ),
       actions: [
-        IconButton(
-          onPressed: () {
-            // TODO: navigate to notifications screen once it exists.
-          },
-          icon: const Icon(Icons.notifications_rounded, color: Colors.white70),
-          tooltip: 'Notifications',
-        ),
+        const NotificationBell(),
         const SizedBox(width: 4),
       ],
     );

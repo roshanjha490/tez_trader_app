@@ -35,3 +35,22 @@ void requestSectorTab(String sector) {
   _sectorRequestNonce++;
   sectorTabRequest.value = SectorTabRequest(sector, _sectorRequestNonce);
 }
+
+
+/// Raised when the server rejects the refresh token mid-session (expired,
+/// revoked by a login on another device, or the account was blocked).
+/// MyApp listens and sends the user back to the login screen.
+class SessionExpiredEvent {
+  final String? message;
+  final int nonce;
+  const SessionExpiredEvent(this.message, this.nonce);
+}
+
+final ValueNotifier<SessionExpiredEvent?> sessionExpired = ValueNotifier(null);
+
+int _sessionExpiredNonce = 0;
+
+void notifySessionExpired([String? message]) {
+  _sessionExpiredNonce++;
+  sessionExpired.value = SessionExpiredEvent(message, _sessionExpiredNonce);
+}

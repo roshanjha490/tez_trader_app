@@ -24,7 +24,11 @@ class _AuthGateState extends State<AuthGate> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _decide());
   }
 
+  bool _offline = false;
+
   Future<void> _decide() async {
+    if (_offline) setState(() => _offline = false);
+
     final refreshToken = await TokenStorage.getRefreshToken();
     if (!mounted) return;
 
@@ -34,16 +38,24 @@ class _AuthGateState extends State<AuthGate> {
       _replaceWith(const LoginScreen());
       return;
     }
-final refreshed = await ApiClient.forceRefresh();
+
+    final outcome = await ApiClient.refreshSession();
     if (!mounted) return;
 
-    if (!refreshed) {
-      // The refresh token itself was rejected (expired/revoked) or the
-      // request failed outright. Only NOW is it safe to clear tokens —
-      // we know for certain the session is actually dead rather than
-      // guessing from a decode error.
-      await TokenStorage.clearTokens();
+    if (outcome == RefreshOutcome.rejected) {
+      // The server rejected the refresh token (expired, revoked by a login
+      // on another device, or the account was blocked). refreshSession has
+      // already cleared the tokens; sessionExpired is handled by MyApp, so
+      // just show the login screen here.
       _replaceWith(const LoginScreen());
+      return;
+    }
+
+    if (outcome == RefreshOutcome.unreachable) {
+      // Offline or the server is down: we can't tell whether the session is
+      // still good, so keep it and let the user retry rather than logging
+      // them out.
+      setState(() => _offline = true);
       return;
     }
 
@@ -51,7 +63,6 @@ final refreshed = await ApiClient.forceRefresh();
     if (!mounted) return;
 
     if (user == null) {
-
       // We just successfully refreshed, so this really shouldn't happen —
       // but if the freshly-saved access token still fails to decode for
       // some reason, don't silently proceed with a null user either.
@@ -66,10 +77,13 @@ final refreshed = await ApiClient.forceRefresh();
       // which isn't a compile-time constant.
       _replaceWith(MainShell());
     } else {
+      // New accounts are created with the placeholder first name "User";
+      // don't prefill that into the onboarding form.
+      final firstName = user.firstName == 'User' ? '' : user.firstName;
       _replaceWith(
         PersonalDetailsScreen(
           data: OnboardingData(
-            firstName: user.firstName,
+            firstName: firstName,
             lastName: user.lastName ?? '',
             email: user.email ?? '',
           ),
@@ -86,6 +100,26 @@ final refreshed = await ApiClient.forceRefresh();
 
   @override
   Widget build(BuildContext context) {
+    if (_offline) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF0E0E1A),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.wifi_off_rounded, color: Colors.white54, size: 40),
+              const SizedBox(height: 16),
+              const Text(
+                "Can't reach Teztrader",
+                style: TextStyle(color: Colors.white, fontSize: 16),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(onPressed: _decide, child: const Text('Retry')),
+            ],
+          ),
+        ),
+      );
+    }
     return const Scaffold(
       backgroundColor: Color(0xFF0E0E1A),
       body: Center(

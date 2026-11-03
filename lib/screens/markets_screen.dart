@@ -1,3 +1,5 @@
+import 'tabs/paper_trading_tab.dart';
+import 'tabs/sectors_hub.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -20,7 +22,7 @@ class MarketsScreen extends StatefulWidget {
 }
 
 // Index of the "Sectors" sub-tab within this screen's TabBar/TabBarView.
-const int _sectorsSubTabIndex = 6;
+const int _sectorsSubTabIndex = 4;
 
 class _MarketsScreenState extends State<MarketsScreen>
     with SingleTickerProviderStateMixin {
@@ -41,8 +43,6 @@ class _MarketsScreenState extends State<MarketsScreen>
 
   // React State equivalents — one list per strategy type now.
   List<dynamic> _reversalStrategies = [];
-  List<dynamic> _railwayStrategies = [];
-  List<dynamic> _rajdhaniStrategies = [];
   List<dynamic> _breakouts = [];
   Map<String, dynamic>? _movers;
   Map<String, dynamic>? _sentiment;
@@ -52,7 +52,7 @@ class _MarketsScreenState extends State<MarketsScreen>
     super.initState();
 
     _tabController = TabController(
-      length: 7,
+      length: 6,
       vsync: this,
       initialIndex: widget.initialTabIndex,
     );
@@ -80,26 +80,6 @@ class _MarketsScreenState extends State<MarketsScreen>
             ..removeWhere((s) => s['symbol'] == data['symbol']);
           updated.insert(0, data);
           _reversalStrategies = updated;
-        }
-        // -- Railway Strategy --
-        else if (type == 'initial_railway_strategies' ||
-            type == 'railway_price_update') {
-          _railwayStrategies = List<dynamic>.from(data);
-        } else if (type == 'railway_strategies_update') {
-          final updated = List<dynamic>.from(_railwayStrategies)
-            ..removeWhere((s) => s['symbol'] == data['symbol']);
-          updated.insert(0, data);
-          _railwayStrategies = updated;
-        }
-        // -- Rajdhani Strategy --
-        else if (type == 'initial_rajdhani_strategies' ||
-            type == 'rajdhani_price_update') {
-          _rajdhaniStrategies = List<dynamic>.from(data);
-        } else if (type == 'rajdhani_strategies_update') {
-          final updated = List<dynamic>.from(_rajdhaniStrategies)
-            ..removeWhere((s) => s['symbol'] == data['symbol']);
-          updated.insert(0, data);
-          _rajdhaniStrategies = updated;
         }
         // -- Breakout Handlers --
         else if (type == 'breakout_tick') {
@@ -195,26 +175,24 @@ class _MarketsScreenState extends State<MarketsScreen>
             fontSize: 14,
           ),
           tabs: const [
-            Tab(text: "Rajdhani"),
-            Tab(text: "Railway"),
             Tab(text: "Reversal"),
             Tab(text: "Top Movers"),
             Tab(text: "Live Breakout"),
             Tab(text: "Shoutbox"),
             Tab(text: "Sectors"),
+            Tab(text: "Paper Trading"),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildStrategiesTab(_rajdhaniStrategies),
-          _buildStrategiesTab(_railwayStrategies),
           _buildStrategiesTab(_reversalStrategies),
           _buildMoversTab(),
           _buildBreakoutsTab(),
           const ShoutboxTab(),
-          SectorsTab(initialSector: widget.initialSector),
+          SectorsHub(initialSector: widget.initialSector),
+          const PaperTradingTab(),
         ],
       ),
     );

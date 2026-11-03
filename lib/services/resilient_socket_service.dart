@@ -26,6 +26,7 @@ class ResilientSocketService with WidgetsBindingObserver {
     required this.wsUriBuilder, // (token) -> full ws:// or wss:// Uri
     required this.ticketFetcher,
     this.subscribeMessage,
+    this.subscribeMessageBuilder,
     this.heartbeatInterval = const Duration(seconds: 20),
     this.heartbeatTimeout = const Duration(seconds: 45),
     this.connectTimeout = const Duration(seconds: 10),
@@ -36,6 +37,10 @@ class ResilientSocketService with WidgetsBindingObserver {
   final Uri Function(String token) wsUriBuilder;
   final TicketFetcher ticketFetcher;
   final Map<String, dynamic>? subscribeMessage;
+
+  /// Like [subscribeMessage] but evaluated on every (re)connect, for feeds
+  /// whose subscription changes over time (e.g. the paper-trading symbols).
+  final Map<String, dynamic>? Function()? subscribeMessageBuilder;
   final Duration heartbeatInterval;
   final Duration heartbeatTimeout;
   // Max time we'll wait for ticketFetcher() + the socket handshake before
@@ -101,6 +106,13 @@ class ResilientSocketService with WidgetsBindingObserver {
   }
 
 
+  /// Sends a message on the live connection; ignored when not connected.
+  void send(Map<String, dynamic> message) {
+    try {
+      _channel?.sink.add(jsonEncode(message));
+    } catch (_) {}
+  }
+
   Future<void> forceReconnect() async {
     if (!_wantsConnection) return;
     _reconnectTimer?.cancel();
@@ -144,8 +156,9 @@ class ResilientSocketService with WidgetsBindingObserver {
       _lastMessageAt = DateTime.now();
       _setConnected(true);
 
-      if (subscribeMessage != null) {
-        channel.sink.add(jsonEncode(subscribeMessage));
+      final subscribe = subscribeMessageBuilder?.call() ?? subscribeMessage;
+      if (subscribe != null) {
+        channel.sink.add(jsonEncode(subscribe));
       }
 
       _sub = channel.stream.listen(

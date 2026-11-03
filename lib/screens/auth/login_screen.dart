@@ -6,7 +6,11 @@ import 'package:tez_trader_app/services/auth_api_client.dart';
 import 'otp_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  /// Shown once as a snackbar, e.g. "Session revoked. Logged in from another
+  /// device." when the server ended the previous session.
+  final String? notice;
+
+  const LoginScreen({super.key, this.notice});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -33,6 +37,13 @@ class _LoginScreenState extends State<LoginScreen>
   void initState() {
     super.initState();
     _phoneController.addListener(_onPhoneChanged);
+
+    final notice = widget.notice;
+    if (notice != null && notice.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showError(notice);
+      });
+    }
 
     _pinkController = AnimationController(
       vsync: this,
@@ -65,7 +76,8 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   void _onPhoneChanged() {
-    final isValid = _phoneController.text.length == 10;
+    // Same rule as the backend: 10 digits, starting with 6-9.
+    final isValid = RegExp(r'^[6-9]\d{9}$').hasMatch(_phoneController.text);
     if (isValid != _isValidNumber) {
       setState(() => _isValidNumber = isValid);
     }
@@ -105,6 +117,16 @@ class _LoginScreenState extends State<LoginScreen>
         _showError('Failed to send OTP. Please try again.');
       }
     } on DioException catch (e) {
+      // 429 = an OTP was already sent in the last 30s, so the code the user
+      // has is still valid: carry on to the OTP screen instead of blocking.
+      if (e.response?.statusCode == 429) {
+        if (mounted) {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => OtpScreen(phoneNumber: phone)),
+          );
+        }
+        return;
+      }
       final message = e.response?.data is Map
           ? (e.response?.data['message'] ?? 'Failed to send OTP. Please try again.')
           : 'Failed to send OTP. Please try again.';

@@ -44,12 +44,28 @@ class CreatePostWidget extends StatefulWidget {
   final EditPostData? initialData;
   final VoidCallback? onCancel;
 
+  /// 500 characters for regular users, 1000 for mentors and admins (same
+  /// limits the backend enforces).
+  final int maxChars;
+
+  /// Feed (pro / vip / elite) the post goes to. Only mentors and admins can
+  /// target a feed other than their own plan; for everyone else the backend
+  /// always posts to the user's own tier.
+  final String? targetFeed;
+
+  /// Mentors and admins can attach one video (record with the camera or pick
+  /// from the gallery). The backend rejects videos from everyone else.
+  final bool allowVideo;
+
   const CreatePostWidget({
     super.key,
     required this.user,
     this.onPostCreated,
     this.initialData,
     this.onCancel,
+    this.maxChars = 500,
+    this.targetFeed,
+    this.allowVideo = false,
   });
 
   @override
@@ -62,12 +78,14 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
 
   List<String> _existingImages = [];
   List<XFile> _selectedImages = [];
+  XFile? _video;
+  static const int maxVideoBytes = 50 * 1024 * 1024; // 50MB, as on the backend
   
   String? _error;
   bool _isSubmitting = false;
 
   static const int maxFiles = 5;
-  static const int maxChars = 200;
+  int get maxChars => widget.maxChars;
   static const int maxFileSizeBytes = 5 * 1024 * 1024; // 5MB
 
   bool get isEditing => widget.initialData != null;
@@ -151,6 +169,58 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
   }
 
   // 4. Shared Validation Logic
+  void _showVideoSourceOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E293B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.videocam, color: Colors.blueAccent),
+              title: const Text('Record with camera', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.of(context).pop();
+                _pickVideo(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.video_library, color: Colors.blueAccent),
+              title: const Text('Choose from gallery', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.of(context).pop();
+                _pickVideo(ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickVideo(ImageSource source) async {
+    try {
+      final file = await _picker.pickVideo(
+        source: source,
+        maxDuration: const Duration(minutes: 3),
+      );
+      if (file == null) return;
+      if (await file.length() > maxVideoBytes) {
+        setState(() => _error = 'Video must not exceed 50 MB.');
+        return;
+      }
+      setState(() {
+        _video = file;
+        _error = null;
+      });
+    } catch (e) {
+      setState(() => _error = 'Failed to pick video');
+    }
+  }
+
   Future<void> _processSelectedFiles(List<XFile> images) async {
     int remainingSlots = maxFiles - totalImages;
     List<XFile> validImages = [];
@@ -172,7 +242,7 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
 
   Future<void> _submitPost() async {
     final text = _textController.text.trim();
-    if (text.isEmpty) {
+    if (text.isEmpty && totalImages == 0 && _video == null) {
       setState(() => _error = "Please write something.");
       return;
     }
@@ -185,6 +255,8 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
     try {
       final formData = FormData.fromMap({
         'content': text,
+        if (!isEditing && widget.targetFeed != null)
+          'target_feed': widget.targetFeed,
       });
 
       for (var url in _existingImages) {
@@ -199,6 +271,23 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
         formData.files.add(MapEntry(
           'images',
           await MultipartFile.fromFile(file.path, filename: file.name),
+        ));
+      }
+
+      if (_video != null && !isEditing) {
+        // The backend accepts MP4 only (mime type, .mp4 name, 'ftyp' header).
+        // Phone cameras may name the file .mov/.MP4; the container is the
+        // same ISO format, so send it under an .mp4 name.
+        final base = _video!.name.contains('.')
+            ? _video!.name.substring(0, _video!.name.lastIndexOf('.'))
+            : _video!.name;
+        formData.files.add(MapEntry(
+          'video',
+          await MultipartFile.fromFile(
+            _video!.path,
+            filename: '$base.mp4',
+            contentType: DioMediaType('video', 'mp4'),
+          ),
         ));
       }
 
@@ -217,12 +306,18 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
           setState(() {
             _selectedImages.clear();
             _existingImages.clear();
+            _video = null;
           });
         }
         widget.onPostCreated?.call();
       } else {
         setState(() => _error = res.data['message'] ?? "Failed to save post");
       }
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      setState(() => _error = data is Map && data['message'] != null
+          ? data['message'].toString()
+          : "Connection error. Please try again.");
     } catch (e) {
       setState(() => _error = "Connection error. Please try again.");
     } finally {
@@ -345,6 +440,35 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
                         ),
                       ),
 
+                    // Selected video
+                    if (_video != null)
+                      Container(
+                        margin: const EdgeInsets.only(top: 4, bottom: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.white12),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.videocam, color: Colors.blueAccent, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _video!.name,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.white70, fontSize: 12),
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () => setState(() => _video = null),
+                              child: const Icon(Icons.close, size: 16, color: Colors.white54),
+                            ),
+                          ],
+                        ),
+                      ),
+
                     // Error Message
                     if (_error != null)
                       Container(
@@ -372,7 +496,9 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Add Photo Text Button
+                        // Add Photo / Video
+                        Row(
+                          children: [
                         GestureDetector(
                           onTap: totalImages >= maxFiles ? null : _showImageSourceOptions,
                           child: Row(
@@ -380,7 +506,7 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
                               Icon(Icons.photo_outlined, size: 20, color: totalImages >= maxFiles ? Colors.white38 : Colors.blueAccent),
                               const SizedBox(width: 6),
                               Text(
-                                "Add Image ($totalImages/$maxFiles)",
+                                "Image ($totalImages/$maxFiles)",
                                 style: TextStyle(
                                   color: totalImages >= maxFiles ? Colors.white38 : Colors.blueAccent, 
                                   fontSize: 13, 
@@ -389,6 +515,30 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
                               ),
                             ],
                           ),
+                        ),
+
+                        if (widget.allowVideo && !isEditing) ...[
+                          const SizedBox(width: 14),
+                          GestureDetector(
+                            onTap: _showVideoSourceOptions,
+                            child: Row(
+                              children: [
+                                Icon(Icons.videocam_outlined, size: 20,
+                                    color: _video != null ? Colors.greenAccent : Colors.blueAccent),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _video != null ? 'Video ✓' : 'Video',
+                                  style: TextStyle(
+                                    color: _video != null ? Colors.greenAccent : Colors.blueAccent,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                          ],
                         ),
 
                         // Cancel & Submit Buttons

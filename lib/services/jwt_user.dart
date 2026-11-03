@@ -16,7 +16,12 @@ class UserSession {
   final String mobile;
   final String? profileImage;
   final String? coverImage;
+  /// Account type from the token's `type` claim: 'users', 'mentor' or 'admin'.
   final String type;
+
+  /// Subscription tier from the token's `plan_name` claim: 'pro', 'vip' or
+  /// 'elite'. The backend falls back to 'pro' when there is no active plan.
+  final String planName;
   final bool profileCompleted;
   final DateTime? createdAt;
   final DateTime? lastLogin;
@@ -30,10 +35,36 @@ class UserSession {
     this.profileImage,
     this.coverImage,
     required this.type,
+    this.planName = 'pro',
     required this.profileCompleted,
     this.createdAt,
     this.lastLogin,
   });
+
+  /// Alias for [type], matching the "user type" naming used on the web.
+  String get userType => type;
+
+  bool get isMentor => type == 'mentor';
+  bool get isAdmin => type == 'admin';
+
+  /// Tier levels used by the community feeds: pro = 1, vip = 2, elite = 3.
+  int get planLevel => planLevelOf(planName);
+
+  static int planLevelOf(String plan) {
+    switch (plan.toLowerCase()) {
+      case 'elite':
+        return 3;
+      case 'vip':
+        return 2;
+      default:
+        return 1;
+    }
+  }
+
+  /// Full display name, skipping a missing last name.
+  String get fullName => [firstName, lastName ?? '']
+      .where((p) => p.trim().isNotEmpty)
+      .join(' ');
 
   /// Reads an int from a payload value that the backend might have encoded
   /// as a real int, a JSON number that decoded as double, or (in some
@@ -61,6 +92,7 @@ class UserSession {
       profileImage: payload['profile_image'] as String?,
       coverImage: payload['cover_image'] as String?,
       type: (payload['type'] as String?) ?? 'users',
+      planName: (payload['plan_name'] as String?) ?? 'pro',
       profileCompleted: (payload['profileCompleted'] as bool?) ?? false,
       createdAt: payload['created_at'] != null
           ? DateTime.tryParse(payload['created_at'].toString())

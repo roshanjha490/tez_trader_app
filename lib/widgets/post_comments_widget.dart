@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+
+import 'package:dio/dio.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../services/api_client.dart';
+import '../../services/token_storage.dart';
 
 class PostCommentsWidget extends StatefulWidget {
   final int postId;
@@ -24,12 +29,24 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
   int _page = 1;
   int? _replyingTo;
 
+  // Regular users can write 30-character comments; mentors and admins 1000
+  // (same limits the backend enforces).
+  int _maxChars = 30;
+
+  // Images attached to the comment being written (max 5, JPG/PNG, 5MB each).
+  final List<XFile> _attachments = [];
+  final ImagePicker _picker = ImagePicker();
+
   final TextEditingController _commentController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
+    TokenStorage.getCurrentUser().then((user) {
+      if (!mounted || user == null) return;
+      if (user.isMentor || user.isAdmin) setState(() => _maxChars = 1000);
+    });
     _fetchComments(1);
 
     // Infinite Scroll Listener for the Bottom Sheet
@@ -87,27 +104,66 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
     }
   }
 
+  Future<void> _pickImages() async {
+    final remaining = 5 - _attachments.length;
+    if (remaining <= 0) return;
+    try {
+      final picked = await _picker.pickMultiImage(limit: remaining >= 2 ? remaining : null);
+      final ok = <XFile>[];
+      for (final f in picked.take(remaining)) {
+        if (await f.length() > 5 * 1024 * 1024) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Images must be 5MB or smaller.')),
+            );
+          }
+          continue;
+        }
+        ok.add(f);
+      }
+      if (ok.isNotEmpty && mounted) setState(() => _attachments.addAll(ok));
+    } catch (_) {}
+  }
+
   Future<void> _submitComment() async {
     final text = _commentController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty && _attachments.isEmpty) return;
 
     setState(() => _submitting = true);
 
     try {
       final res = await ApiClient.dio.post(
         '/community/posts/${widget.postId}/comments',
-        data: {
+        data: FormData.fromMap({
           'content': text,
-          'parent_id': _replyingTo,
-        },
+          if (_replyingTo != null) 'parent_id': _replyingTo,
+          'images': [
+            for (final f in _attachments)
+              await MultipartFile.fromFile(f.path, filename: f.name),
+          ],
+        }),
       );
 
       if (mounted && res.data['success'] == true) {
         _commentController.clear();
-        setState(() => _replyingTo = null);
+        setState(() {
+          _replyingTo = null;
+          _attachments.clear();
+        });
         
         // Refresh to show new comment
         await _fetchComments(1);
+      }
+    } on DioException catch (e) {
+      if (mounted) {
+        final data = e.response?.data;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(data is Map && data['message'] != null
+                ? data['message'].toString()
+                : "Failed to connect to server"),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -303,9 +359,68 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
               ],
             ),
           ),
+        if (_attachments.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: SizedBox(
+              height: 60,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  for (var i = 0; i < _attachments.length; i++)
+                    Stack(
+                      children: [
+                        Container(
+                          width: 60,
+                          height: 60,
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            image: DecorationImage(
+                              image: FileImage(File(_attachments[i].path)),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 2,
+                          right: 10,
+                          child: GestureDetector(
+                            onTap: () => setState(() => _attachments.removeAt(i)),
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                              child: const Icon(Icons.close, size: 12, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+          ),
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
+            GestureDetector(
+              onTap: _attachments.length >= 5 ? null : _pickImages,
+              child: Container(
+                height: 44,
+                width: 44,
+                margin: const EdgeInsets.only(right: 8, bottom: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                ),
+                child: Icon(
+                  Icons.image_outlined,
+                  size: 20,
+                  color: _attachments.length >= 5 ? Colors.white24 : Colors.white70,
+                ),
+              ),
+            ),
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
@@ -315,12 +430,14 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
                 ),
                 child: TextField(
                   controller: _commentController,
+                  maxLength: _maxChars,
                   minLines: 1,
                   maxLines: 4, 
                   style: const TextStyle(color: Colors.white, fontSize: 14),
                   decoration: InputDecoration(
                     hintText: _replyingTo != null ? "Write a reply..." : "Add a comment...",
                     hintStyle: const TextStyle(color: Colors.white38),
+                    counterText: '',
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   ),
@@ -393,9 +510,28 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            name,
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                          Flexible(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    name,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                  ),
+                                ),
+                                // Gold tick for admins, green for mentors.
+                                if (comment['user_type'] == 'admin' || comment['user_type'] == 'mentor') ...[
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    Icons.verified,
+                                    size: 14,
+                                    color: comment['user_type'] == 'admin' ? Colors.amberAccent : Colors.greenAccent,
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
                           if (isOwner)
                             GestureDetector(
@@ -405,10 +541,19 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        comment['content'] ?? '',
-                        style: const TextStyle(color: Colors.white70, fontSize: 13),
-                      ),
+                      if ((comment['content'] ?? '').toString().isNotEmpty)
+                        Text(
+                          comment['content'] ?? '',
+                          style: const TextStyle(color: Colors.white70, fontSize: 13),
+                        ),
+                      for (final url in (comment['images'] as List? ?? const []))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(url.toString(), fit: BoxFit.cover, width: double.infinity),
+                          ),
+                        ),
                     ],
                   ),
                 ),

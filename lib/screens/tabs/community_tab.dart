@@ -3,15 +3,15 @@ import '../../services/api_client.dart'; // Adjust to your actual API Client
 import '../../widgets/create_post_widget.dart';
 import '../../widgets/post_comments_widget.dart'; // Custom widget for post actions
 import '../../services/token_storage.dart';
+import '../../services/jwt_user.dart';
+import '../../widgets/post_video.dart';
+import '../../widgets/poll_card.dart';
+import '../../widgets/create_poll_sheet.dart';
+import 'package:dio/dio.dart';
 import '../main_shell.dart'; // 1. IMPORT ACTIVETAB HERE!
 
 class CommunityTab extends StatefulWidget {
-  final int currentUserId; // Pass this from your auth state if possible
-
-  const CommunityTab({
-    super.key,
-    this.currentUserId = 1,
-  }); // Defaulted for testing
+  const CommunityTab({super.key});
 
   @override
   State<CommunityTab> createState() => _CommunityTabState();
@@ -42,15 +42,42 @@ class _CommunityTabState extends State<CommunityTab> {
   String? _error;
 
   // Filters
-  String _filter = 'latest'; // "latest" | "top"
+  String _filter = 'latest'; // "latest" | "top" | "highlighted"
   String? _activeTag;
+
+  // Tiered feeds: pro (1) < vip (2) < elite (3). Users can read feeds up to
+  // their plan level; the backend enforces the same rule.
+  static const List<String> _feeds = ['pro', 'vip', 'elite'];
+  String _feed = 'pro';
+  bool _locked = false; // current feed is above the user's plan
+  UserSession? _me;
+
+  int get _myId => _me?.id ?? 0;
+  int get _myLevel => _me?.planLevel ?? 1;
+
+  /// Regular users post only in their own tier; mentors in any tier up to
+  /// their plan; admins anywhere (same rules as the portal).
+  bool get _canPost {
+    final me = _me;
+    if (me == null || _locked) return false;
+    final feedLevel = UserSession.planLevelOf(_feed);
+    if (_filter == 'polls' && !(me.isAdmin || me.isMentor)) return false;
+    if (me.isAdmin) return true;
+    if (me.isMentor) return feedLevel <= _myLevel;
+    return feedLevel == _myLevel;
+  }
+
+  bool get _isStaff => _me?.isMentor == true || _me?.isAdmin == true;
+
+  int get _maxChars => (_me?.isMentor == true || _me?.isAdmin == true) ? 1000 : 500;
 
   final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    
+    _loadUser();
+
     // 3. REMOVED _fetchPosts(reset: true) FROM HERE
     // We let didChangeDependencies handle the initial load instead to prevent duplicate API calls.
 
@@ -84,6 +111,18 @@ class _CommunityTabState extends State<CommunityTab> {
     super.dispose();
   }
 
+  Future<void> _loadUser() async {
+    final user = await TokenStorage.getCurrentUser();
+    if (!mounted || user == null) return;
+    setState(() {
+      _me = user;
+      _feed = _feeds.contains(user.planName.toLowerCase())
+          ? user.planName.toLowerCase()
+          : 'pro';
+    });
+    if (_isActive) _fetchPosts(reset: true);
+  }
+
   // ==========================================
   // API LOGIC
   // ==========================================
@@ -98,8 +137,11 @@ class _CommunityTabState extends State<CommunityTab> {
     }
 
     try {
-      String url = '/community/posts?page=$_page&filter=$_filter';
-      if (_activeTag != null) {
+      // Tiered endpoint: only returns approved, non-poll posts of this feed.
+      String url = _filter == 'polls'
+          ? '/community/polls?page=$_page&feed=$_feed'
+          : '/community/plan_posts?page=$_page&filter=$_filter&feed=$_feed';
+      if (_activeTag != null && _filter != 'polls') {
         url += '&tag=${Uri.encodeComponent(_activeTag!)}';
       }
 
@@ -108,12 +150,29 @@ class _CommunityTabState extends State<CommunityTab> {
       if (mounted && response.data['success'] == true) {
         final newPosts = List<Map<String, dynamic>>.from(response.data['data']);
         setState(() {
+          _locked = false;
           if (reset) {
             _posts = newPosts;
           } else {
             _posts.addAll(newPosts);
           }
           _hasMore = response.data['pagination']?['hasMore'] ?? false;
+          _isLoading = false;
+        });
+      }
+    } on DioException catch (e) {
+      if (!mounted) return;
+      if (e.response?.statusCode == 403) {
+        // Feed above the user's plan: show the upgrade card instead.
+        setState(() {
+          _locked = true;
+          _posts = [];
+          _hasMore = false;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _error = "Couldn't load posts. Please try again.";
           _isLoading = false;
         });
       }
@@ -173,6 +232,15 @@ class _CommunityTabState extends State<CommunityTab> {
     _fetchPosts(reset: true);
   }
 
+  void _setFeed(String feed) {
+    if (_feed == feed) return;
+    setState(() {
+      _feed = feed;
+      _activeTag = null;
+    });
+    _fetchPosts(reset: true);
+  }
+
   void _setTag(String? tag) {
     if (_activeTag == tag) return;
     _activeTag = tag;
@@ -181,7 +249,7 @@ class _CommunityTabState extends State<CommunityTab> {
 
   void _openCreatePostModal({EditPostData? existingPost}) async {
     // 1. Fetch the actual logged-in user securely
-    final currentUser = await TokenStorage.getCurrentUser();
+    final currentUser = _me ?? await TokenStorage.getCurrentUser();
 
     // Safety check to ensure the widget is still on screen after the await
     if (!mounted) return;
@@ -206,6 +274,13 @@ class _CommunityTabState extends State<CommunityTab> {
                   'profile_image': currentUser?.profileImage,
                 },
                 initialData: existingPost,
+                maxChars: _maxChars,
+                allowVideo: _isStaff,
+                // Mentors/admins choose the feed by browsing it; regular
+                // users always post to their own tier.
+                targetFeed: (_me?.isMentor == true || _me?.isAdmin == true)
+                    ? _feed
+                    : null,
                 onPostCreated: () {
                   Navigator.pop(context);
                   _fetchPosts(reset: true);
@@ -218,6 +293,65 @@ class _CommunityTabState extends State<CommunityTab> {
           ),
         );
       },
+    );
+  }
+
+  /// Mentors and admins choose between a post (text, images, video) and a
+  /// poll; everyone else goes straight to the post composer.
+  void _onComposePressed() {
+    if (!_isStaff) {
+      _openCreatePostModal();
+      return;
+    }
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E293B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit, color: Colors.blueAccent),
+              title: const Text('New post', style: TextStyle(color: Colors.white)),
+              subtitle: const Text('Text, images or a video', style: TextStyle(color: Colors.white38)),
+              onTap: () {
+                Navigator.pop(context);
+                _openCreatePostModal();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.poll_outlined, color: Colors.blueAccent),
+              title: const Text('New poll', style: TextStyle(color: Colors.white)),
+              subtitle: const Text('2–4 options', style: TextStyle(color: Colors.white38)),
+              onTap: () {
+                Navigator.pop(context);
+                _openCreatePollModal();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openCreatePollModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: CreatePollSheet(
+          targetFeed: _feed,
+          maxQuestionChars: _maxChars,
+          onCreated: () {
+            Navigator.pop(context);
+            _fetchPosts(reset: true);
+          },
+        ),
+      ),
     );
   }
 
@@ -593,11 +727,13 @@ class _CommunityTabState extends State<CommunityTab> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _openCreatePostModal(), 
-        backgroundColor: Colors.blueAccent,
-        child: const Icon(Icons.edit, color: Colors.white),
-      ),
+      floatingActionButton: _canPost
+          ? FloatingActionButton(
+              onPressed: _onComposePressed,
+              backgroundColor: Colors.blueAccent,
+              child: const Icon(Icons.edit, color: Colors.white),
+            )
+          : null,
       body: Column(
         children: [
           _buildFilterBar(),
@@ -611,9 +747,45 @@ class _CommunityTabState extends State<CommunityTab> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Filter Toggle
+          // Feed (tier) selector
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: _feeds.map((f) {
+              final level = UserSession.planLevelOf(f);
+              final locked = level > _myLevel;
+              final active = _feed == f;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (locked)
+                        const Padding(
+                          padding: EdgeInsets.only(right: 4),
+                          child: Icon(Icons.lock, size: 12, color: Colors.white54),
+                        ),
+                      Text(f.toUpperCase()),
+                    ],
+                  ),
+                  selected: active,
+                  onSelected: (_) => _setFeed(f),
+                  selectedColor: Colors.blueAccent.withOpacity(0.35),
+                  backgroundColor: Colors.white.withOpacity(0.05),
+                  labelStyle: TextStyle(
+                    color: active ? Colors.white : Colors.white60,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  side: BorderSide(color: Colors.white.withOpacity(0.1)),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+          // Filter Toggle (Pinned / Latest / Top Rated / Polls), centred
           Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
@@ -625,6 +797,11 @@ class _CommunityTabState extends State<CommunityTab> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 _FilterButton(
+                  title: 'Pinned',
+                  isActive: _filter == 'highlighted',
+                  onTap: () => _setFilter('highlighted'),
+                ),
+                _FilterButton(
                   title: 'Latest',
                   isActive: _filter == 'latest',
                   onTap: () => _setFilter('latest'),
@@ -633,6 +810,11 @@ class _CommunityTabState extends State<CommunityTab> {
                   title: 'Top Rated',
                   isActive: _filter == 'top',
                   onTap: () => _setFilter('top'),
+                ),
+                _FilterButton(
+                  title: 'Polls',
+                  isActive: _filter == 'polls',
+                  onTap: () => _setFilter('polls'),
                 ),
               ],
             ),
@@ -685,6 +867,36 @@ class _CommunityTabState extends State<CommunityTab> {
   }
 
   Widget _buildFeed() {
+    if (_locked) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.lock_outline, color: Colors.white38, size: 44),
+              const SizedBox(height: 16),
+              Text(
+                '${_feed.toUpperCase()} community is locked',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'You are on the ${(_me?.planName ?? 'pro').toUpperCase()} plan. '
+                'Upgrade your plan to access this feed.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white54, fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     if (_isLoading) {
       return const Center(
         child: CircularProgressIndicator(color: Colors.blueAccent),
@@ -708,8 +920,8 @@ class _CommunityTabState extends State<CommunityTab> {
     }
 
     if (_posts.isEmpty) {
-      return const Center(
-        child: Text("No posts yet.", style: TextStyle(color: Colors.white54)),
+      return Center(
+        child: Text(_filter == 'polls' ? "No polls yet." : "No posts yet.", style: const TextStyle(color: Colors.white54)),
       );
     }
 
@@ -738,11 +950,73 @@ class _CommunityTabState extends State<CommunityTab> {
     );
   }
 
+  Widget _buildPollItem(Map<String, dynamic> post) {
+    final user = post['user'] ?? {};
+    final poll = post['poll'];
+    final userType = user['user_type']?.toString();
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.03),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: Colors.blueAccent.withOpacity(0.2),
+                backgroundImage: user['avatar'] != null ? NetworkImage(user['avatar']) : null,
+                child: user['avatar'] == null
+                    ? Text(
+                        (user['name']?.toString() ?? 'U').isEmpty ? 'U' : user['name'].toString()[0].toUpperCase(),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  _capitalizeName(user['name']),
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+              ),
+              if (userType == 'admin' || userType == 'mentor') ...[
+                const SizedBox(width: 4),
+                Icon(Icons.verified, size: 15,
+                    color: userType == 'admin' ? Colors.amberAccent : Colors.greenAccent),
+              ],
+              const Spacer(),
+              Text(_timeAgo(post['created_at']),
+                  style: const TextStyle(color: Colors.white38, fontSize: 11)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (poll is Map)
+            PollCard(
+              key: ValueKey('poll_${post['id']}'),
+              postId: (post['id'] as num).toInt(),
+              question: post['content']?.toString() ?? '',
+              poll: Map<String, dynamic>.from(poll),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPostCard(Map<String, dynamic> post, int index) {
+    if (_filter == 'polls') return _buildPollItem(post);
     final user = post['user'] ?? {};
     final tags = post['tags'] as List<dynamic>? ?? [];
     final images = post['images'] as List<dynamic>? ?? [];
-    final isCreator = widget.currentUserId.toString() == user['id']?.toString();
+    final isCreator = _myId != 0 && _myId.toString() == user['id']?.toString();
+    final videoUrl = post['video_url'] as String?;
+    final userType = user['user_type']?.toString();
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -781,13 +1055,35 @@ class _CommunityTabState extends State<CommunityTab> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      _capitalizeName(user['name']),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            _capitalizeName(user['name']),
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                        // Gold tick for admins, green for mentors.
+                        if (userType == 'admin' || userType == 'mentor') ...[
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.verified,
+                            size: 16,
+                            color: userType == 'admin'
+                                ? Colors.amberAccent
+                                : Colors.greenAccent,
+                          ),
+                        ],
+                        if (post['isHighlighted'] == true) ...[
+                          const SizedBox(width: 6),
+                          const Icon(Icons.star, size: 14, color: Colors.amberAccent),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -846,6 +1142,12 @@ class _CommunityTabState extends State<CommunityTab> {
                   )
                   .toList(),
             ),
+          ],
+
+          // Video (mentors/admins only)
+          if (videoUrl != null && videoUrl.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            PostVideo(url: videoUrl),
           ],
 
           // Images
@@ -910,7 +1212,7 @@ class _CommunityTabState extends State<CommunityTab> {
                               0.85, // Takes up 85% of the screen height
                           child: PostCommentsWidget(
                             postId: post['id'],
-                            currentUserId: widget.currentUserId,
+                            currentUserId: _myId,
                           ),
                         ),
                       );
@@ -986,7 +1288,7 @@ class _FilterButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isActive ? Colors.white.withOpacity(0.1) : Colors.transparent,
           borderRadius: BorderRadius.circular(6),

@@ -1,5 +1,10 @@
 import 'package:dio/dio.dart';
 
+/// The backend's CORS gate rejects any request without an Origin header
+/// ("Access blocked: Missing Origin header") and only accepts its allow-list.
+/// Native apps send no Origin of their own, so every API client sets this one.
+const String apiOrigin = 'https://teztrader.com';
+
 /// Dedicated Dio client for endpoints that run BEFORE the user is logged in
 /// (send OTP, verify OTP, etc). These endpoints:
 ///   - live directly under the domain root, no `/api` prefix
@@ -10,9 +15,10 @@ import 'package:dio/dio.dart';
 class AuthApiClient {
   static final Dio dio = Dio(
     BaseOptions(
-      baseUrl: 'https://api.swissvermont.com', // no /api prefix here
+      baseUrl: 'https://api.teztrader.com', // no /api prefix here
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
+      headers: {'Origin': apiOrigin},
     ),
   );
 }

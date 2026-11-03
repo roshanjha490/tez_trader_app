@@ -1,7 +1,11 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:tez_trader_app/widgets/edit_profile_screen.dart';
 import 'package:tez_trader_app/widgets/self_post_feed.dart';
+import '../services/api_client.dart';
 import '../services/token_storage.dart';
+import 'mentor_profile_screen.dart' show PagedApiList, ReplyCard;
 import 'auth/login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -22,6 +26,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
       MaterialPageRoute(builder: (_) => const LoginScreen()),
       (route) => false,
     );
+  }
+
+  /// Mentors can change their profile photo (the backend rejects everyone
+  /// else with 403). Saves the refreshed access token so the new image shows
+  /// up everywhere.
+  Future<void> _changePhoto(BuildContext context) async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (picked == null) return;
+    if (await picked.length() > 5 * 1024 * 1024) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Image must be 5MB or smaller.')),
+        );
+      }
+      return;
+    }
+    try {
+      final res = await ApiClient.dio.post(
+        '/user/upload-image',
+        data: FormData.fromMap({
+          'type': 'profile',
+          'image': await MultipartFile.fromFile(picked.path, filename: picked.name),
+        }),
+      );
+      final token = res.data['token'] as String?;
+      if (token != null) await TokenStorage.saveTokens(accessToken: token);
+      if (mounted) setState(() {});
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(data is Map && data['message'] != null
+                ? data['message'].toString()
+                : 'Failed to upload image.'),
+          ),
+        );
+      }
+    }
+  }
+
+  /// +91 ******1234
+  String _maskedMobile(String? mobile) {
+    if (mobile == null || mobile.length < 4) return '+91 ******0000';
+    final digits = mobile.replaceAll(RegExp(r'\D'), '');
+    final last4 = digits.length >= 4 ? digits.substring(digits.length - 4) : digits;
+    return '+91 ******$last4';
   }
 
   String _getInitials(dynamic user) {
@@ -58,7 +109,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final user = snapshot.data;
 
         return DefaultTabController(
-          length: 3,
+          length: 2,
           child: Column(
             children: [
               _buildHeader(user, context),
@@ -78,7 +129,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 tabs: [
                   Tab(text: 'Details'),
                   Tab(text: 'My Feed'),
-                  Tab(text: 'Security'),
                 ],
               ),
               Expanded(
@@ -86,7 +136,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     _buildPersonalInfoTab(user),
                     _buildMyFeedTab(user),
-                    _buildSecurityTab(user),
                   ],
                 ),
               ),
@@ -104,16 +153,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: _accentColor,
-            child: Text(
-              _getInitials(user),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-              ),
+          GestureDetector(
+            onTap: user?.isMentor == true ? () => _changePhoto(context) : null,
+            child: CircleAvatar(
+              radius: 28,
+              backgroundColor: _accentColor,
+              backgroundImage: user?.profileImage != null ? NetworkImage(user.profileImage) : null,
+              child: user?.profileImage == null
+                  ? Text(
+                      _getInitials(user),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    )
+                  : null,
             ),
           ),
           const SizedBox(width: 16),
@@ -135,6 +190,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(width: 6),
+                    if (user?.isMentor == true)
+                      const Padding(
+                        padding: EdgeInsets.only(right: 6),
+                        child: Icon(Icons.verified, size: 16, color: Colors.greenAccent),
+                      ),
+                    if (user != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _accentColor.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          (user.planName as String).toUpperCase(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 2),
@@ -188,9 +264,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _buildInfoCard(
             icon: Icons.phone_android,
             title: 'Mobile Number',
-            value: user?.mobile ?? '+91 ******0000',
+            value: _maskedMobile(user?.mobile),
             isLocked: true, // Cannot edit mobile
           ),
+          const SizedBox(height: 16),
+          _buildInfoCard(
+            icon: Icons.workspace_premium_outlined,
+            title: 'Plan',
+            value: (user?.planName ?? 'pro').toString().toUpperCase(),
+          ),
+          if (user?.createdAt != null) ...[
+            const SizedBox(height: 16),
+            _buildInfoCard(
+              icon: Icons.calendar_month_outlined,
+              title: 'Member Since',
+              value:
+                  '${user.createdAt.day}/${user.createdAt.month}/${user.createdAt.year}',
+            ),
+          ],
           const SizedBox(height: 32),
           ElevatedButton.icon(
             onPressed: () async {
@@ -233,41 +324,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // --- TAB 2: MY FEED ---
   Widget _buildMyFeedTab(dynamic user) {
-    return SelfPostFeed(currentUserId: user?.id);
-  }
-
-  // --- TAB 3: SECURITY ---
-  Widget _buildSecurityTab(dynamic user) {
-    return RefreshIndicator(
-      onRefresh: () async => setState(() {}),
-      color: _accentColor,
-      backgroundColor: _cardColor,
-      child: ListView(
-        padding: const EdgeInsets.all(24),
+    return DefaultTabController(
+      length: 2,
+      child: Column(
         children: [
-          _buildInfoCard(
-            icon: Icons.shield_outlined,
-            title: 'Two-Factor Authentication',
-            value: 'Enabled via Authenticator App',
-            valueColor: Colors.greenAccent,
+          const TabBar(
+            indicatorColor: _accentColor,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white54,
+            dividerColor: Colors.transparent,
+            tabs: [Tab(text: 'Posts'), Tab(text: 'Replies')],
           ),
-          const SizedBox(height: 16),
-          _buildInfoCard(
-            icon: Icons.fingerprint,
-            title: 'Biometric Unlock',
-            value: 'Tap to configure FaceID/TouchID',
-          ),
-          const SizedBox(height: 16),
-          _buildInfoCard(
-            icon: Icons.history,
-            title: 'Last Login',
-            value: 'Today at 10:45 AM (Delhi, IN)', // Will come from API
-          ),
-          const SizedBox(height: 16),
-          _buildInfoCard(
-            icon: Icons.devices,
-            title: 'Connected Devices',
-            value: 'iPhone 15 Pro (Active)\nMacBook Pro (Web)',
+          Expanded(
+            child: TabBarView(
+              children: [
+                SelfPostFeed(currentUserId: user?.id),
+                PagedApiList(
+                  path: '/community/me/replies',
+                  emptyText: "You haven't replied to any posts yet.",
+                  itemBuilder: (item) => ReplyCard(reply: item),
+                ),
+              ],
+            ),
           ),
         ],
       ),

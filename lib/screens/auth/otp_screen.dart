@@ -153,7 +153,7 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
     try {
       final response = await AuthApiClient.dio.post(
         '/auth/verifyOTP',
-        data: {'mobile': widget.phoneNumber, 'otp': _enteredOtp},
+        data: {'mobile': widget.phoneNumber, 'otp': _enteredOtp, 'platform': 'mobile'},
       );
 
       if (!mounted) return;

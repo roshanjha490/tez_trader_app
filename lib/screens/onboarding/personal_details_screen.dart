@@ -37,10 +37,17 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
     super.dispose();
   }
 
+  // Mirrors the backend's validateDisplayName: letters (any language),
+  // spaces, apostrophes, dots and hyphens; at most 30 characters.
+  static final _nameRegex = RegExp(r"^[\p{L}\p{M}][\p{L}\p{M} .'-]*$", unicode: true);
+
+  static bool _validName(String value) =>
+      value.isNotEmpty && value.length <= 30 && _nameRegex.hasMatch(value);
+
   bool get _isValid {
     final email = _emailController.text.trim();
-    return _firstNameController.text.trim().isNotEmpty &&
-        _lastNameController.text.trim().isNotEmpty &&
+    return _validName(_firstNameController.text.trim()) &&
+        _validName(_lastNameController.text.trim()) &&
         email.contains('@') &&
         email.contains('.');
   }
