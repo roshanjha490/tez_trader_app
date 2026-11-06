@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 	<dict>
+		<key>NSCameraUsageDescription</key>
+		<string>Tez Trader uses the camera so you can attach photos to posts and comments.</string>
+		<key>NSMicrophoneUsageDescription</key>
+		<string>Tez Trader uses the microphone when you record a video for a post.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Tez Trader lets you pick photos and videos from your library to attach to posts and comments.</string>
 		<key>CADisableMinimumFrameDurationOnPhone</key>
 		<true/>
 		<key>CFBundleDevelopmentRegion</key>

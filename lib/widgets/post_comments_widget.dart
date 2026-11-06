@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../services/api_client.dart';
 import '../../services/token_storage.dart';
+import 'app_background.dart';
 
 class PostCommentsWidget extends StatefulWidget {
   final int postId;
@@ -51,7 +52,8 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
 
     // Infinite Scroll Listener for the Bottom Sheet
     _scrollController.addListener(() {
-      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 100) {
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent - 100) {
         if (_hasMore && !_loadingMore) {
           _fetchComments(_page + 1);
         }
@@ -78,8 +80,10 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
     }
 
     try {
-      final res = await ApiClient.dio.get('/community/posts/${widget.postId}/comments?page=$pageNum');
-      
+      final res = await ApiClient.dio.get(
+        '/community/posts/${widget.postId}/comments?page=$pageNum',
+      );
+
       if (mounted && res.data['success'] == true) {
         final newComments = List<Map<String, dynamic>>.from(res.data['data']);
         setState(() {
@@ -104,11 +108,76 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
     }
   }
 
+  void _showImageSourceOptions() {
+    if (_attachments.length >= 5) return;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E293B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(
+                Icons.photo_library,
+                color: Colors.blueAccent,
+              ),
+              title: const Text(
+                'Photo Gallery',
+                style: TextStyle(color: Colors.white),
+              ),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _pickImages();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: Colors.blueAccent),
+              title: const Text(
+                'Camera',
+                style: TextStyle(color: Colors.white),
+              ),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _captureImage();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _captureImage() async {
+    try {
+      final shot = await _picker.pickImage(source: ImageSource.camera);
+      if (shot != null) await _addAttachments([shot]);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open the camera.')),
+        );
+      }
+    }
+  }
+
   Future<void> _pickImages() async {
     final remaining = 5 - _attachments.length;
     if (remaining <= 0) return;
     try {
-      final picked = await _picker.pickMultiImage(limit: remaining >= 2 ? remaining : null);
+      final picked = await _picker.pickMultiImage(
+        limit: remaining >= 2 ? remaining : null,
+      );
+      await _addAttachments(picked);
+    } catch (_) {}
+  }
+
+  Future<void> _addAttachments(List<XFile> picked) async {
+    final remaining = 5 - _attachments.length;
+    if (remaining <= 0) return;
+    {
       final ok = <XFile>[];
       for (final f in picked.take(remaining)) {
         if (await f.length() > 5 * 1024 * 1024) {
@@ -122,7 +191,7 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
         ok.add(f);
       }
       if (ok.isNotEmpty && mounted) setState(() => _attachments.addAll(ok));
-    } catch (_) {}
+    }
   }
 
   Future<void> _submitComment() async {
@@ -150,7 +219,7 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
           _replyingTo = null;
           _attachments.clear();
         });
-        
+
         // Refresh to show new comment
         await _fetchComments(1);
       }
@@ -159,9 +228,11 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
         final data = e.response?.data;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(data is Map && data['message'] != null
-                ? data['message'].toString()
-                : "Failed to connect to server"),
+            content: Text(
+              data is Map && data['message'] != null
+                  ? data['message'].toString()
+                  : "Failed to connect to server",
+            ),
           ),
         );
       }
@@ -181,16 +252,28 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1E293B),
-        title: const Text("Delete Comment", style: TextStyle(color: Colors.white)),
-        content: const Text("Are you sure you want to delete this comment?", style: TextStyle(color: Colors.white70)),
+        title: const Text(
+          "Delete Comment",
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          "Are you sure you want to delete this comment?",
+          style: TextStyle(color: Colors.white70),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel", style: TextStyle(color: Colors.white54)),
+            child: const Text(
+              "Cancel",
+              style: TextStyle(color: Colors.white54),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text("Delete", style: TextStyle(color: Colors.redAccent)),
+            child: const Text(
+              "Delete",
+              style: TextStyle(color: Colors.redAccent),
+            ),
           ),
         ],
       ),
@@ -204,7 +287,9 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
     });
 
     try {
-      final res = await ApiClient.dio.delete('/community/posts/comments/$commentId');
+      final res = await ApiClient.dio.delete(
+        '/community/posts/comments/$commentId',
+      );
       if (res.data['success'] != true) {
         throw Exception(res.data['message']);
       }
@@ -225,10 +310,13 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
   String _capitalizeName(String? firstName, String? lastName) {
     final full = '${firstName ?? ''} ${lastName ?? ''}'.trim();
     if (full.isEmpty) return 'Trader';
-    return full.split(' ').map((word) {
-      if (word.isEmpty) return '';
-      return word[0].toUpperCase() + word.substring(1).toLowerCase();
-    }).join(' ');
+    return full
+        .split(' ')
+        .map((word) {
+          if (word.isEmpty) return '';
+          return word[0].toUpperCase() + word.substring(1).toLowerCase();
+        })
+        .join(' ');
   }
 
   String _getInitials(String? firstName, String? lastName) {
@@ -245,60 +333,81 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
 
   @override
   Widget build(BuildContext context) {
-
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final safeBottom = MediaQuery.of(context).padding.bottom;
     final bottomPadding = bottomInset > 0 ? 16.0 : 16.0 + safeBottom;
 
-    return Container(
-      padding: EdgeInsets.only(left: 16, right: 16, top: 12, bottom: bottomPadding),
-      decoration: const BoxDecoration(
-        color: Color(0xFF0B0F19), // Dark background for the sheet
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        children: [
-          // 1. Drag Indicator Pill & Header
-          const SizedBox(height: 12),
-          Container(
-            height: 4,
-            width: 40,
-            margin: const EdgeInsets.symmetric(vertical: 8), 
-            decoration: BoxDecoration(
-              color: Colors.white24,
-              borderRadius: BorderRadius.circular(2),
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      child: AppBackground(
+        child: Container(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 12,
+            bottom: bottomPadding,
+          ),
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(color: Colors.white.withOpacity(0.08)),
             ),
           ),
-          const SizedBox(height: 16),
-          const Text(
-            "Comments",
-            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
-          const Divider(color: Colors.white12, height: 1),
+          child: Column(
+            children: [
+              // 1. Drag Indicator Pill & Header
+              const SizedBox(height: 12),
+              Container(
+                height: 4,
+                width: 40,
+                margin: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                "Comments",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Divider(color: Colors.white12, height: 1),
 
-          // 2. Scrollable Comments List
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Colors.blueAccent))
-                : _buildCommentsList(),
-          ),
+              // 2. Scrollable Comments List
+              Expanded(
+                child: _isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: Colors.blueAccent,
+                        ),
+                      )
+                    : _buildCommentsList(),
+              ),
 
-          // 3. Pinned Input Form at the bottom
-          Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF0B0F19),
-              border: Border(top: BorderSide(color: Colors.white.withOpacity(0.05))),
-            ),
-            child: _buildCommentInput(),
+              // 3. Pinned Input Form at the bottom
+              Container(
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: Colors.white.withOpacity(0.05)),
+                  ),
+                ),
+                child: _buildCommentInput(),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildCommentsList() {
-    final parentComments = _comments.where((c) => c['parent_id'] == null).toList();
+    final parentComments = _comments
+        .where((c) => c['parent_id'] == null)
+        .toList();
 
     if (parentComments.isEmpty) {
       return const Center(
@@ -317,12 +426,16 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
         if (index == parentComments.length) {
           return const Padding(
             padding: EdgeInsets.all(16.0),
-            child: Center(child: CircularProgressIndicator(color: Colors.blueAccent)),
+            child: Center(
+              child: CircularProgressIndicator(color: Colors.blueAccent),
+            ),
           );
         }
 
         final parent = parentComments[index];
-        final replies = _comments.where((c) => c['parent_id'] == parent['id']).toList();
+        final replies = _comments
+            .where((c) => c['parent_id'] == parent['id'])
+            .toList();
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -345,17 +458,28 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
             padding: const EdgeInsets.only(left: 12.0, bottom: 8.0),
             child: Row(
               children: [
-                const Icon(Icons.subdirectory_arrow_right, size: 14, color: Colors.blueAccent),
+                const Icon(
+                  Icons.subdirectory_arrow_right,
+                  size: 14,
+                  color: Colors.blueAccent,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   "Replying to comment",
-                  style: TextStyle(color: Colors.blueAccent.withOpacity(0.8), fontSize: 12),
+                  style: TextStyle(
+                    color: Colors.blueAccent.withOpacity(0.8),
+                    fontSize: 12,
+                  ),
                 ),
                 const Spacer(),
                 GestureDetector(
                   onTap: () => setState(() => _replyingTo = null),
-                  child: const Icon(Icons.close, size: 16, color: Colors.white54),
-                )
+                  child: const Icon(
+                    Icons.close,
+                    size: 16,
+                    color: Colors.white54,
+                  ),
+                ),
               ],
             ),
           ),
@@ -386,11 +510,19 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
                           top: 2,
                           right: 10,
                           child: GestureDetector(
-                            onTap: () => setState(() => _attachments.removeAt(i)),
+                            onTap: () =>
+                                setState(() => _attachments.removeAt(i)),
                             child: Container(
                               padding: const EdgeInsets.all(2),
-                              decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                              child: const Icon(Icons.close, size: 12, color: Colors.white),
+                              decoration: const BoxDecoration(
+                                color: Colors.black54,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.close,
+                                size: 12,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ),
@@ -404,7 +536,7 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             GestureDetector(
-              onTap: _attachments.length >= 5 ? null : _pickImages,
+              onTap: _attachments.length >= 5 ? null : _showImageSourceOptions,
               child: Container(
                 height: 44,
                 width: 44,
@@ -417,7 +549,9 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
                 child: Icon(
                   Icons.image_outlined,
                   size: 20,
-                  color: _attachments.length >= 5 ? Colors.white24 : Colors.white70,
+                  color: _attachments.length >= 5
+                      ? Colors.white24
+                      : Colors.white70,
                 ),
               ),
             ),
@@ -432,14 +566,19 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
                   controller: _commentController,
                   maxLength: _maxChars,
                   minLines: 1,
-                  maxLines: 4, 
+                  maxLines: 4,
                   style: const TextStyle(color: Colors.white, fontSize: 14),
                   decoration: InputDecoration(
-                    hintText: _replyingTo != null ? "Write a reply..." : "Add a comment...",
+                    hintText: _replyingTo != null
+                        ? "Write a reply..."
+                        : "Add a comment...",
                     hintStyle: const TextStyle(color: Colors.white38),
                     counterText: '',
                     border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                   ),
                 ),
               ),
@@ -452,12 +591,21 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
                 width: 44,
                 margin: const EdgeInsets.only(bottom: 2),
                 decoration: BoxDecoration(
-                  color: _submitting ? Colors.blueAccent.withOpacity(0.5) : Colors.blueAccent,
+                  color: _submitting
+                      ? Colors.blueAccent.withOpacity(0.5)
+                      : Colors.blueAccent,
                   shape: BoxShape.circle,
                 ),
                 child: Center(
                   child: _submitting
-                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
                       : const Icon(Icons.send, color: Colors.white, size: 18),
                 ),
               ),
@@ -468,26 +616,33 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
     );
   }
 
-  Widget _buildCommentRow(Map<String, dynamic> comment, {required bool isReply}) {
+  Widget _buildCommentRow(
+    Map<String, dynamic> comment, {
+    required bool isReply,
+  }) {
     final name = _capitalizeName(comment['first_name'], comment['last_name']);
-    final isOwner = widget.currentUserId.toString() == comment['user_id']?.toString();
+    final isOwner =
+        widget.currentUserId.toString() == comment['user_id']?.toString();
 
     return Padding(
-      padding: EdgeInsets.only(
-        top: 16.0,
-        left: isReply ? 40.0 : 0.0, 
-      ),
+      padding: EdgeInsets.only(top: 16.0, left: isReply ? 40.0 : 0.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CircleAvatar(
             radius: 14,
             backgroundColor: Colors.blueAccent.withOpacity(0.2),
-            backgroundImage: comment['avatar'] != null ? NetworkImage(comment['avatar']) : null,
+            backgroundImage: comment['avatar'] != null
+                ? NetworkImage(comment['avatar'])
+                : null,
             child: comment['avatar'] == null
                 ? Text(
                     _getInitials(comment['first_name'], comment['last_name']),
-                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
                   )
                 : null,
           ),
@@ -498,9 +653,12 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.04), 
+                    color: Colors.white.withOpacity(0.04),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.white.withOpacity(0.05)),
                   ),
@@ -518,16 +676,23 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
                                   child: Text(
                                     name,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
                                   ),
                                 ),
                                 // Gold tick for admins, green for mentors.
-                                if (comment['user_type'] == 'admin' || comment['user_type'] == 'mentor') ...[
+                                if (comment['user_type'] == 'admin' ||
+                                    comment['user_type'] == 'mentor') ...[
                                   const SizedBox(width: 4),
                                   Icon(
                                     Icons.verified,
                                     size: 14,
-                                    color: comment['user_type'] == 'admin' ? Colors.amberAccent : Colors.greenAccent,
+                                    color: comment['user_type'] == 'admin'
+                                        ? Colors.amberAccent
+                                        : Colors.greenAccent,
                                   ),
                                 ],
                               ],
@@ -536,43 +701,61 @@ class _PostCommentsWidgetState extends State<PostCommentsWidget> {
                           if (isOwner)
                             GestureDetector(
                               onTap: () => _deleteComment(comment['id']),
-                              child: const Icon(Icons.delete_outline, size: 14, color: Colors.white38),
-                            )
+                              child: const Icon(
+                                Icons.delete_outline,
+                                size: 14,
+                                color: Colors.white38,
+                              ),
+                            ),
                         ],
                       ),
                       const SizedBox(height: 4),
                       if ((comment['content'] ?? '').toString().isNotEmpty)
                         Text(
                           comment['content'] ?? '',
-                          style: const TextStyle(color: Colors.white70, fontSize: 13),
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                          ),
                         ),
-                      for (final url in (comment['images'] as List? ?? const []))
+                      for (final url
+                          in (comment['images'] as List? ?? const []))
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: Image.network(url.toString(), fit: BoxFit.cover, width: double.infinity),
+                            child: Image.network(
+                              url.toString(),
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                            ),
                           ),
                         ),
                     ],
                   ),
                 ),
-                
+
                 if (!isReply)
                   Padding(
                     padding: const EdgeInsets.only(top: 6.0, left: 8.0),
                     child: GestureDetector(
                       onTap: () {
                         setState(() {
-                          _replyingTo = _replyingTo == comment['id'] ? null : comment['id'];
+                          _replyingTo = _replyingTo == comment['id']
+                              ? null
+                              : comment['id'];
                         });
                       },
                       child: Text(
                         _replyingTo == comment['id'] ? 'Cancel Reply' : 'Reply',
-                        style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  )
+                  ),
               ],
             ),
           ),

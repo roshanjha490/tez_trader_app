@@ -8,7 +8,11 @@ import '../theme/app_colors.dart';
 class AppBackground extends StatelessWidget {
   final Widget child;
 
-  const AppBackground({super.key, required this.child});
+  /// Set when the Scaffold uses extendBodyBehindAppBar, so [child] starts
+  /// below the app bar while the glows still paint behind it.
+  final bool underAppBar;
+
+  const AppBackground({super.key, required this.child, this.underAppBar = false});
 
   Widget _glow(Alignment center, double radius, Color color, double opacity) {
     return IgnorePointer(
@@ -32,7 +36,16 @@ class AppBackground extends StatelessWidget {
         _glow(const Alignment(-0.5, -0.7), 0.9, AppColors.blueGlow, 0.20),
         _glow(const Alignment(0, 0.5), 1.1, AppColors.purpleGlow, 0.20),
         _glow(const Alignment(-0.2, 0.0), 0.7, AppColors.emeraldGlow, 0.10),
-        child,
+        underAppBar
+            ? Padding(
+                // With extendBodyBehindAppBar, Scaffold already reports the status bar
+                // plus the app bar height as the body's top padding.
+                padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
+                // The padding above already clears the status bar, so scroll
+                // views inside must not add it a second time.
+                child: MediaQuery.removePadding(context: context, removeTop: true, child: child),
+              )
+            : child,
       ],
     );
   }

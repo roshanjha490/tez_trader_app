@@ -1,8 +1,10 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/onboarding_data.dart';
 import '../../services/api_client.dart';
+import '../../services/legal_links.dart';
 import '../../services/token_storage.dart';
 import '../../widgets/onboarding_scaffold.dart';
 import '../../widgets/selectable_tile.dart';
@@ -29,6 +31,8 @@ class _ExperienceConfirmationScreenState extends State<ExperienceConfirmationScr
   bool _confirmAccurate = false;
   bool _agreeTerms = false;
   bool _isSubmitting = false;
+  late final TapGestureRecognizer _termsTap;
+  late final TapGestureRecognizer _privacyTap;
 
   @override
   void initState() {
@@ -36,6 +40,17 @@ class _ExperienceConfirmationScreenState extends State<ExperienceConfirmationScr
     _tradingExperience = widget.data.tradingExperience;
     _confirmAccurate = widget.data.confirmAccurate;
     _agreeTerms = widget.data.agreeTerms;
+    _termsTap = TapGestureRecognizer()
+      ..onTap = () => LegalLinks.open(context, LegalLinks.termsOfUse);
+    _privacyTap = TapGestureRecognizer()
+      ..onTap = () => LegalLinks.open(context, LegalLinks.privacyPolicy);
+  }
+
+  @override
+  void dispose() {
+    _termsTap.dispose();
+    _privacyTap.dispose();
+    super.dispose();
   }
 
   bool get _isValid =>
@@ -177,9 +192,30 @@ class _ExperienceConfirmationScreenState extends State<ExperienceConfirmationScr
                 _buildCheckbox(
                   value: _agreeTerms,
                   onChanged: (v) => setState(() => _agreeTerms = v ?? false),
-                  label: const Text(
-                    'I agree to the Terms of Service and Privacy Policy for creating my account.',
-                    style: TextStyle(fontSize: 13, color: Colors.white70),
+                  label: Text.rich(
+                    TextSpan(
+                      text: 'I agree to the ',
+                      style:
+                          const TextStyle(fontSize: 13, color: Colors.white70),
+                      children: [
+                        TextSpan(
+                          text: 'Terms of Service',
+                          style: const TextStyle(
+                              decoration: TextDecoration.underline,
+                              color: Colors.white),
+                          recognizer: _termsTap,
+                        ),
+                        const TextSpan(text: ' and '),
+                        TextSpan(
+                          text: 'Privacy Policy',
+                          style: const TextStyle(
+                              decoration: TextDecoration.underline,
+                              color: Colors.white),
+                          recognizer: _privacyTap,
+                        ),
+                        const TextSpan(text: ' for creating my account.'),
+                      ],
+                    ),
                   ),
                 ),
               ],

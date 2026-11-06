@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_client.dart';
+import '../services/initials.dart';
+import 'poll_card.dart';
 import 'post_comments_widget.dart';
 import 'post_video.dart';
 
@@ -111,7 +113,7 @@ class _SimplePostCardState extends State<SimplePostCard> {
                 backgroundImage: user['avatar'] != null ? NetworkImage(user['avatar']) : null,
                 child: user['avatar'] == null
                     ? Text(
-                        name.isEmpty ? 'U' : name[0].toUpperCase(),
+                        initialsFor(name),
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                       )
                     : null,
@@ -160,10 +162,18 @@ class _SimplePostCardState extends State<SimplePostCard> {
             ],
           ),
           const SizedBox(height: 12),
-          Text(
-            _post['content']?.toString() ?? '',
-            style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
-          ),
+          if (_post['poll'] is Map)
+            PollCard(
+              key: ValueKey('poll_${_post['id']}'),
+              postId: (_post['id'] as num).toInt(),
+              question: _post['content']?.toString() ?? '',
+              poll: Map<String, dynamic>.from(_post['poll'] as Map),
+            )
+          else
+            Text(
+              _post['content']?.toString() ?? '',
+              style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
+            ),
           if (tags.isNotEmpty) ...[
             const SizedBox(height: 10),
             Wrap(

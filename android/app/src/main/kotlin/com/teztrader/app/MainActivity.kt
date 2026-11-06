@@ -1,4 +1,4 @@
-package com.example.tez_trader_app
+package com.teztrader.app
 
 import io.flutter.embedding.android.FlutterActivity
 

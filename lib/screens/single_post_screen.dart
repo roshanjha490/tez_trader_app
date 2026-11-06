@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../widgets/app_background.dart';
+import '../widgets/themed_app_bar.dart';
 
 import '../services/api_client.dart';
+import '../services/initials.dart';
 import '../services/token_storage.dart';
 import '../widgets/post_comments_widget.dart';
+import '../widgets/poll_card.dart';
 import '../widgets/post_video.dart';
 
 /// One post opened from a notification link. Mirrors the portal's
@@ -114,13 +117,9 @@ class _SinglePostScreenState extends State<SinglePostScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        title: const Text('Post', style: TextStyle(color: Colors.white)),
-      ),
-      body: AppBackground(child: _buildBody()),
+      extendBodyBehindAppBar: true,
+      appBar: const ThemedAppBar(title: 'Post'),
+      body: AppBackground(underAppBar: true, child: _buildBody()),
     );
   }
 
@@ -188,7 +187,7 @@ class _SinglePostScreenState extends State<SinglePostScreen> {
               backgroundImage: user['avatar'] != null ? NetworkImage(user['avatar']) : null,
               child: user['avatar'] == null
                   ? Text(
-                      name.isEmpty ? 'U' : name[0].toUpperCase(),
+                      initialsFor(name),
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                     )
                   : null,
@@ -230,10 +229,18 @@ class _SinglePostScreenState extends State<SinglePostScreen> {
           ],
         ),
         const SizedBox(height: 16),
-        SelectableText(
-          post['content']?.toString() ?? '',
-          style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.4),
-        ),
+        if (post['poll'] is Map)
+          PollCard(
+            key: ValueKey('poll_${post['id']}'),
+            postId: widget.postId,
+            question: post['content']?.toString() ?? '',
+            poll: Map<String, dynamic>.from(post['poll'] as Map),
+          )
+        else
+          SelectableText(
+            post['content']?.toString() ?? '',
+            style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.4),
+          ),
         if (tags.isNotEmpty) ...[
           const SizedBox(height: 12),
           Wrap(

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_client.dart';
+import '../services/initials.dart';
+import 'poll_card.dart';
 import '../widgets/post_comments_widget.dart';
 import '../widgets/create_post_widget.dart';
 
@@ -441,8 +443,8 @@ class _SelfPostFeedState extends State<SelfPostFeed> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _cardColor,
-        border: Border.all(color: Colors.white10),
+        color: Colors.white.withOpacity(0.03),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -454,11 +456,11 @@ class _SelfPostFeedState extends State<SelfPostFeed> {
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundColor: _accentColor.withOpacity(0.2),
+                backgroundColor: Colors.blueAccent.withOpacity(0.2),
                 backgroundImage: user['avatar'] != null ? NetworkImage(user['avatar']) : null,
                 child: user['avatar'] == null
                     ? Text(
-                        (user['name']?.isNotEmpty == true ? user['name'][0] : 'U').toUpperCase(),
+                        initialsFor(user['name']?.toString()),
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                       )
                     : null,
@@ -489,7 +491,15 @@ class _SelfPostFeedState extends State<SelfPostFeed> {
           const SizedBox(height: 12),
 
           // Content
-          _ExpandablePostContent(content: post['content'] ?? ''),
+          if (post['poll'] is Map)
+            PollCard(
+              key: ValueKey('poll_${post['id']}'),
+              postId: (post['id'] as num).toInt(),
+              question: post['content']?.toString() ?? '',
+              poll: Map<String, dynamic>.from(post['poll'] as Map),
+            )
+          else
+            _ExpandablePostContent(content: post['content'] ?? ''),
 
           // Tags
           if (tags.isNotEmpty) ...[

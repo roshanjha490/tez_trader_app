@@ -1,8 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 
 import 'package:tez_trader_app/services/auth_api_client.dart';
+import 'package:tez_trader_app/services/legal_links.dart';
 import 'otp_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -405,13 +407,38 @@ class _LoginScreenState extends State<LoginScreen>
 /// Wraps the terms & conditions text in a ShaderMask whose gradient slides
 /// left-to-right on a loop, producing a soft "wave of light" brightening
 /// effect passing over the text.
-class _ShimmerWaveText extends StatelessWidget {
+class _ShimmerWaveText extends StatefulWidget {
   const _ShimmerWaveText({required this.controller});
 
   final AnimationController controller;
 
   @override
+  State<_ShimmerWaveText> createState() => _ShimmerWaveTextState();
+}
+
+class _ShimmerWaveTextState extends State<_ShimmerWaveText> {
+  late final TapGestureRecognizer _termsTap;
+  late final TapGestureRecognizer _privacyTap;
+
+  @override
+  void initState() {
+    super.initState();
+    _termsTap = TapGestureRecognizer()
+      ..onTap = () => LegalLinks.open(context, LegalLinks.termsOfUse);
+    _privacyTap = TapGestureRecognizer()
+      ..onTap = () => LegalLinks.open(context, LegalLinks.privacyPolicy);
+  }
+
+  @override
+  void dispose() {
+    _termsTap.dispose();
+    _privacyTap.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final controller = widget.controller;
     return AnimatedBuilder(
       animation: controller,
       builder: (context, child) {
@@ -439,23 +466,25 @@ class _ShimmerWaveText extends StatelessWidget {
           child: child,
         );
       },
-      child: const Text.rich(
+      child: Text.rich(
         TextSpan(
           text: 'I agree to the ',
-          style: TextStyle(fontSize: 12, color: Colors.white54),
+          style: const TextStyle(fontSize: 12, color: Colors.white54),
           children: [
             TextSpan(
               text: 'Terms & Conditions',
-              style: TextStyle(
+              style: const TextStyle(
                   decoration: TextDecoration.underline,
                   color: Colors.white70),
+              recognizer: _termsTap,
             ),
-            TextSpan(text: ' and '),
+            const TextSpan(text: ' and '),
             TextSpan(
               text: 'Privacy Policy',
-              style: TextStyle(
+              style: const TextStyle(
                   decoration: TextDecoration.underline,
                   color: Colors.white70),
+              recognizer: _privacyTap,
             ),
           ],
         ),

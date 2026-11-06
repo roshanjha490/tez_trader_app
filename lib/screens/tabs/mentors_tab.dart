@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/api_client.dart';
+import '../../services/initials.dart';
 import '../mentor_profile_screen.dart';
 
 /// Grid-style list of mentors, oldest first, 12 per page with "load more".
@@ -131,7 +132,7 @@ class _MentorsTabState extends State<MentorsTab> {
                     backgroundImage: m['avatar'] != null ? NetworkImage(m['avatar']) : null,
                     child: m['avatar'] == null
                         ? Text(
-                            name.isEmpty ? 'M' : name[0].toUpperCase(),
+                            initialsFor(name, fallback: 'M'),
                             style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
                           )
                         : null,

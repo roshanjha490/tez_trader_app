@@ -8,10 +8,10 @@ class WatchlistWidget extends StatefulWidget {
   const WatchlistWidget({super.key, required this.livePrices});
 
   @override
-  State<WatchlistWidget> createState() => _WatchlistWidgetState();
+  State<WatchlistWidget> createState() => WatchlistWidgetState();
 }
 
-class _WatchlistWidgetState extends State<WatchlistWidget> {
+class WatchlistWidgetState extends State<WatchlistWidget> {
   static const _accentColor = Color(0xFF6C63FF);
 
   List<String> _savedSymbols = [];
@@ -23,10 +23,11 @@ class _WatchlistWidgetState extends State<WatchlistWidget> {
   void initState() {
     super.initState();
     _allSymbols = SECTORS.values.expand((s) => s).toSet().toList()..sort();
-    _loadWatchlist();
+    reload();
   }
 
-  Future<void> _loadWatchlist() async {
+  /// Re-fetches the saved symbols (also used by the home pull-to-refresh).
+  Future<void> reload() async {
     final res = await WatchlistService.getWatchlist();
     if (!mounted) return;
     setState(() {

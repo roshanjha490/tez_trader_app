@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../services/initials.dart';
 import '../../services/api_client.dart'; // Adjust to your actual API Client
 import '../../widgets/create_post_widget.dart';
 import '../../widgets/post_comments_widget.dart'; // Custom widget for post actions
@@ -973,7 +974,7 @@ class _CommunityTabState extends State<CommunityTab> {
                 backgroundImage: user['avatar'] != null ? NetworkImage(user['avatar']) : null,
                 child: user['avatar'] == null
                     ? Text(
-                        (user['name']?.toString() ?? 'U').isEmpty ? 'U' : user['name'].toString()[0].toUpperCase(),
+                        initialsFor(user['name']?.toString()),
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                       )
                     : null,
@@ -1041,7 +1042,7 @@ class _CommunityTabState extends State<CommunityTab> {
                     : null,
                 child: user['avatar'] == null
                     ? Text(
-                        user['name']?.substring(0, 1).toUpperCase() ?? 'U',
+                        initialsFor(user['name']?.toString()),
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,

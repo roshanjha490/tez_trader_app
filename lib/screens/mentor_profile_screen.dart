@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../widgets/app_background.dart';
+import '../widgets/themed_app_bar.dart';
 
 import '../services/api_client.dart';
+import '../services/initials.dart';
 import '../services/token_storage.dart';
 import '../widgets/simple_post_card.dart';
 import 'single_post_screen.dart';
@@ -65,13 +67,9 @@ class _MentorProfileScreenState extends State<MentorProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        title: const Text('Mentor', style: TextStyle(color: Colors.white)),
-      ),
-      body: AppBackground(child: _body()),
+      extendBodyBehindAppBar: true,
+      appBar: const ThemedAppBar(title: 'Mentor'),
+      body: AppBackground(underAppBar: true, child: _body()),
     );
   }
 
@@ -109,8 +107,20 @@ class _MentorProfileScreenState extends State<MentorProfileScreen> {
                   height: 100,
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.05),
-                    image: cover != null ? DecorationImage(image: NetworkImage(cover), fit: BoxFit.cover) : null,
+                    // No cover photo: paint the portal's emerald-to-blue banner.
+                    gradient: cover == null || cover.isEmpty
+                        ? LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              AppColors.emeraldGlow.withOpacity(0.55),
+                              AppColors.blueGlow.withOpacity(0.45),
+                            ],
+                          )
+                        : null,
+                    image: cover != null && cover.isNotEmpty
+                        ? DecorationImage(image: NetworkImage(cover), fit: BoxFit.cover)
+                        : null,
                   ),
                 ),
                 Positioned(
@@ -125,7 +135,7 @@ class _MentorProfileScreenState extends State<MentorProfileScreen> {
                       backgroundImage: m['avatar'] != null ? NetworkImage(m['avatar']) : null,
                       child: m['avatar'] == null
                           ? Text(
-                              name.isEmpty ? 'M' : name[0].toUpperCase(),
+                              initialsFor(name, fallback: 'M'),
                               style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
                             )
                           : null,

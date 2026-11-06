@@ -23,6 +23,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   Future<dynamic>? _userFuture;
+  final GlobalKey<WatchlistWidgetState> _watchlistKey = GlobalKey<WatchlistWidgetState>();
 
   StreamSubscription<Map<String, dynamic>>? _pricesSub;
   Map<String, dynamic> _livePrices = {};
@@ -77,6 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
     await Future.wait([
       refreshed,
       sectorsSocket.forceReconnect(),
+      _watchlistKey.currentState?.reload() ?? Future<void>.value(),
     ]);
     if (mounted) {
       setState(() {
@@ -132,7 +134,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 24),
 
                     // 4. Watchlist
-                    WatchlistWidget(livePrices: _livePrices),
+                    WatchlistWidget(key: _watchlistKey, livePrices: _livePrices),
                     const SizedBox(height: 24),
 
                     // 5. Sector performance (tap a row -> Markets > Sectors)

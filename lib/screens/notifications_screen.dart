@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../widgets/app_background.dart';
+import '../widgets/themed_app_bar.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/notifications_service.dart';
@@ -163,11 +164,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        title: const Text('Notifications', style: TextStyle(color: Colors.white)),
+      extendBodyBehindAppBar: true,
+      appBar: ThemedAppBar(
+        title: 'Notifications',
         actions: [
           if (_unreadCount > 0)
             TextButton.icon(
@@ -178,6 +177,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ],
       ),
       body: AppBackground(
+        underAppBar: true,
         child: Column(
         children: [
           Padding(
